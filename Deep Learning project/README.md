@@ -21,4 +21,13 @@ Install dependencies from the project directory:
 
 ```powershell
 python -m pip install -r requirements.txt
+python -m pip install -e .
+```
+
+With the project virtual environment selected and the working directory set to this
+folder, start training and evaluate the best validation checkpoint with:
+
+```powershell
+python -m wikiart.train --epochs 20
+python -m wikiart.evaluate
 ```

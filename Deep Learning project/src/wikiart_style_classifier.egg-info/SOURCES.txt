@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+src/wikiart/__init__.py
+src/wikiart/data.py
+src/wikiart/evaluate.py
+src/wikiart/model.py
+src/wikiart/train.py
+src/wikiart_style_classifier.egg-info/PKG-INFO
+src/wikiart_style_classifier.egg-info/SOURCES.txt
+src/wikiart_style_classifier.egg-info/dependency_links.txt
+src/wikiart_style_classifier.egg-info/top_level.txt

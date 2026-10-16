@@ -46,11 +46,12 @@ Deep Learning project/
 ├── ARCHITECTURE.md             # model and workflow plan
 ├── README.md
 ├── requirements.txt
+├── pyproject.toml              # install the src/ package in editable mode
 ├── make_wikiart_subset.py      # reproducible dataset preparation
 ├── data/                       # local, ignored
 │   └── wikiart_styles/         # 5 classes × 200 images, metadata, subset info
 ├── notebooks/                  # exploration and course experiments
-├── src/wikiart/                # data loading, model, training, evaluation modules
+├── src/wikiart/                # data.py, model.py, train.py, evaluate.py
 ├── checkpoints/                # saved weights, ignored
 └── reports/figures/            # plots and confusion matrices
 ```
