@@ -1,4 +1,4 @@
-"""Train the WikiArt CNN using the TP05 train/validation workflow."""
+"""Train a WikiArt image classifier with validation tracking."""
 
 import argparse
 import json
@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 
 from .data import create_dataloaders
-from .model import WikiArtCNN
+from .model import build_model
 
 
 def set_seed(seed: int) -> None:
@@ -23,6 +23,12 @@ def set_seed(seed: int) -> None:
 
 def train_one_epoch(model, loader, loss_fn, optimizer, device):
     model.train()
+    # Keep frozen pretrained BatchNorm layers' ImageNet running statistics fixed.
+    for module in model.modules():
+        if isinstance(module, nn.BatchNorm2d) and not any(
+            parameter.requires_grad for parameter in module.parameters()
+        ):
+            module.eval()
     total_loss, correct, total = 0.0, 0, 0
     for images, labels in loader:
         images, labels = images.to(device), labels.to(device)
@@ -59,14 +65,30 @@ def fit(
     val_loader,
     epochs,
     learning_rate,
+    optimizer_name,
     device,
     checkpoint_path,
     classes,
     seed,
     image_size,
+    normalization,
+    architecture,
+    width,
+    pretrained,
 ):
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    if architecture == "resnet18":
+        optimizer_parameters = [
+            {"params": model.layer4.parameters(), "lr": learning_rate * 0.1},
+            {"params": model.fc.parameters(), "lr": learning_rate},
+        ]
+    else:
+        optimizer_parameters = model.parameters()
+    if optimizer_name == "sgd":
+        optimizer = torch.optim.SGD(optimizer_parameters, lr=learning_rate)
+    else:
+        optimizer = torch.optim.Adam(optimizer_parameters, lr=learning_rate)
+
     history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
     checkpoint_path = Path(checkpoint_path)
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -89,11 +111,17 @@ def fit(
                     "model_state_dict": model.state_dict(),
                     "classes": classes,
                     "num_classes": len(classes),
+                    "architecture": architecture,
+                    "width": width,
+                    "pretrained": pretrained,
                     "image_size": image_size,
+                    "normalization": normalization,
                     "dropout": 0.3,
                     "seed": seed,
                     "best_val_loss": best_val_loss,
                     "best_val_acc": val_acc,
+                    "optimizer": optimizer_name,
+                    "learning_rate": learning_rate,
                 },
                 checkpoint_path,
             )
@@ -111,14 +139,22 @@ def main():
     parser.add_argument("--data-dir", default="data/wikiart_styles")
     parser.add_argument("--checkpoint", default="checkpoints/best_model.pt")
     parser.add_argument("--history", default="outputs/history.json")
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--image-size", type=int, default=128)
-    parser.add_argument("--learning-rate", type=float, default=1e-3)
+    parser.add_argument("--model", choices=("cnn", "resnet18"), default="cnn")
+    parser.add_argument("--width", type=int, choices=(1, 2), default=1)
+    parser.add_argument("--learning-rate", type=float, default=0.01)
+    parser.add_argument("--optimizer", choices=("sgd", "adam"), default="sgd")
+    parser.add_argument(
+        "--normalization", choices=("train", "half", "imagenet"), default="train"
+    )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
     if args.epochs < 1:
         parser.error("--epochs must be at least 1")
+    if args.learning_rate <= 0:
+        parser.error("--learning-rate must be positive")
 
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -127,9 +163,20 @@ def main():
         batch_size=args.batch_size,
         image_size=args.image_size,
         seed=args.seed,
+        normalization=args.normalization,
     )
-    model = WikiArtCNN(num_classes=len(classes)).to(device)
-    print(f"device: {device} | classes: {classes}")
+    pretrained = args.model == "resnet18"
+    model = build_model(
+        architecture=args.model,
+        num_classes=len(classes),
+        width=args.width,
+        pretrained=pretrained,
+    ).to(device)
+    print(
+        f"device: {device} | classes: {classes} | optimizer: {args.optimizer} "
+        f"| normalization: {args.normalization} | model: {args.model} "
+        f"| pretrained: {pretrained}"
+    )
 
     history = fit(
         model,
@@ -137,11 +184,16 @@ def main():
         val_loader,
         epochs=args.epochs,
         learning_rate=args.learning_rate,
+        optimizer_name=args.optimizer,
         device=device,
         checkpoint_path=args.checkpoint,
         classes=classes,
         seed=args.seed,
         image_size=args.image_size,
+        normalization=args.normalization,
+        architecture=args.model,
+        width=args.width,
+        pretrained=pretrained,
     )
     history_path = Path(args.history)
     history_path.parent.mkdir(parents=True, exist_ok=True)

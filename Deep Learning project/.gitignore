@@ -12,6 +12,7 @@
 .venv/
 /FINAL PROJECT_.docx
 /make_wikiart_subset.py
+/Slide today.pdf
 
 # Python and notebook cache files
 __pycache__/

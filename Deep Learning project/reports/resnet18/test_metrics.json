@@ -1,0 +1,49 @@
+{
+  "test_loss": 0.5305578009285981,
+  "test_accuracy": 0.8,
+  "classification_report": {
+    "Baroque": {
+      "precision": 0.7777777777777778,
+      "recall": 0.7777777777777778,
+      "f1-score": 0.7777777777777778,
+      "support": 45.0
+    },
+    "Cubism": {
+      "precision": 0.8085106382978723,
+      "recall": 0.8444444444444444,
+      "f1-score": 0.8260869565217391,
+      "support": 45.0
+    },
+    "Impressionism": {
+      "precision": 0.7058823529411765,
+      "recall": 0.8,
+      "f1-score": 0.75,
+      "support": 45.0
+    },
+    "Pop_Art": {
+      "precision": 0.7906976744186046,
+      "recall": 0.7555555555555555,
+      "f1-score": 0.7727272727272727,
+      "support": 45.0
+    },
+    "Ukiyo_e": {
+      "precision": 0.9487179487179487,
+      "recall": 0.8222222222222222,
+      "f1-score": 0.8809523809523809,
+      "support": 45.0
+    },
+    "accuracy": 0.8,
+    "macro avg": {
+      "precision": 0.806317278430676,
+      "recall": 0.8,
+      "f1-score": 0.801508877595834,
+      "support": 225.0
+    },
+    "weighted avg": {
+      "precision": 0.8063172784306759,
+      "recall": 0.8,
+      "f1-score": 0.8015088775958341,
+      "support": 225.0
+    }
+  }
+}
