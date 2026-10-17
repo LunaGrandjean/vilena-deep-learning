@@ -49,3 +49,27 @@ class WikiArtCNN(nn.Module):
         features = self.features(images)
         pooled = self.pool(features)
         return self.classifier(pooled)
+
+##Feed-forward network (MLP): flatten the image, then fully connected layers
+class WikiArtMLP(nn.Module):
+
+    def __init__(self, num_classes: int, image_size: int = 64, hidden1: int = 256, hidden2: int = 128):
+        super().__init__()
+        n_inputs = 3 * image_size * image_size   # 3 colors x 64 x 64 = 12,288 numbers per image
+
+        self.flatten = nn.Flatten()                     # (3, 64, 64) -> one vector of 12,288
+        self.layer1 = nn.Linear(n_inputs, hidden1)      # 12,288 -> 256
+        self.layer2 = nn.Linear(hidden1, hidden2)       # 256 -> 128
+        self.output = nn.Linear(hidden2, num_classes)   # 128 -> 5 logits (one per style)
+        self.relu = nn.ReLU()
+
+        # He initialization for the ReLU layers (keeps signals stable from layer to layer)
+        for layer in [self.layer1, self.layer2]:
+            nn.init.kaiming_normal_(layer.weight, nonlinearity="relu")
+            nn.init.zeros_(layer.bias)
+
+    def forward(self, images):
+        x = self.flatten(images)
+        x = self.relu(self.layer1(x))   # Z1 = W1·X + b1, then A1 = ReLU(Z1)
+        x = self.relu(self.layer2(x))   # Z2 = W2·A1 + b2, then A2 = ReLU(Z2)
+        return self.output(x)           # raw logits 
