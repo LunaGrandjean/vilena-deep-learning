@@ -1,0 +1,39 @@
+{
+  "model": "classical",
+  "seed": 0,
+  "device": "cpu",
+  "threads": 1,
+  "features": "16x16 RGB pixels and 32-bin histograms for each RGB channel (864 features)",
+  "feature_extraction_train_val_seconds": 0.97197960000085,
+  "training_seconds": 1.4310665000011795,
+  "training_timing_scope": "Scaler fits, all C candidates and validation; excludes image features",
+  "selected_C": 0.01,
+  "validation_candidates": [
+    {
+      "C": 0.01,
+      "validation_loss": 1.4500583410263062,
+      "validation_accuracy": 0.38222222222222224
+    },
+    {
+      "C": 0.1,
+      "validation_loss": 1.986158013343811,
+      "validation_accuracy": 0.3688888888888889
+    },
+    {
+      "C": 1,
+      "validation_loss": 3.6081857681274414,
+      "validation_accuracy": 0.31555555555555553
+    },
+    {
+      "C": 10,
+      "validation_loss": 5.681253910064697,
+      "validation_accuracy": 0.3333333333333333
+    }
+  ],
+  "split_counts": {
+    "train": 1050,
+    "validation": 225,
+    "test": 225
+  },
+  "dataset_signature": "07dd1bd2f78cc0b633b74ac2149d9e3d00b82da3d2003e3807fea8ca203b56b6"
+}

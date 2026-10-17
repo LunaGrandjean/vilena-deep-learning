@@ -1,4 +1,4 @@
-"""Compact CNN for the five-class WikiArt style subset."""
+"""Dense MLP, compact CNN and pretrained ResNet18 for WikiArt styles."""
 
 import torch.nn as nn
 from torchvision.models import ResNet18_Weights, resnet18
@@ -11,6 +11,29 @@ def _conv_block(in_channels: int, out_channels: int) -> nn.Sequential:
         nn.ReLU(inplace=True),
         nn.MaxPool2d(kernel_size=2),
     )
+
+
+class WikiArtMLP(nn.Module):
+    """Flatten RGB pixels, then learn two dense hidden layers from scratch."""
+
+    def __init__(self, num_classes, image_size=32, hidden_dim=256, dropout=0.3):
+        super().__init__()
+        if num_classes < 2 or image_size < 1 or hidden_dim < 2:
+            raise ValueError("Invalid MLP dimensions")
+        self.layers = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(3 * image_size * image_size, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim // 2, num_classes),
+        )
+        self.apply(WikiArtCNN._initialize)
+
+    def forward(self, images):
+        return self.layers(images)
 
 
 class WikiArtCNN(nn.Module):
@@ -62,8 +85,12 @@ def build_model(
     dropout: float = 0.3,
     width: int = 1,
     pretrained: bool = False,
+    image_size: int = 128,
+    hidden_dim: int = 256,
 ) -> nn.Module:
-    """Build the project CNN or a pretrained ResNet18 for WikiArt classes."""
+    """Output raw logits; CrossEntropyLoss applies log-softmax internally."""
+    if architecture == "mlp":
+        return WikiArtMLP(num_classes, image_size, hidden_dim, dropout)
     if architecture == "cnn":
         return WikiArtCNN(num_classes=num_classes, dropout=dropout, width=width)
     if architecture == "resnet18":

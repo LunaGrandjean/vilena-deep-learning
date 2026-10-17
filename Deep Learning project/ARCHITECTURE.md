@@ -1,5 +1,24 @@
 # Project architecture
 
+The current dataset contains **1,500 images (300 per style)** under
+`data/wikiart_style5/`, with a 1,050/225/225 train/validation/test split.
+The [README](README.md) describes the current commands and full comparison.
+
+## Additional models and analysis
+
+- `WikiArtMLP`: flattened 32x32 RGB pixels, dense layers of 256 and 128 units,
+  ReLU, Dropout(0.3), then five output logits.
+- ResNet18: ImageNet initialization, 224x224 input, fine-tuned last residual
+  block and classifier; earlier weights and BatchNorm statistics remain fixed.
+- Classical reference: standardized 16x16 RGB pixels and color histograms,
+  logistic regression with regularization selected on validation.
+- `analyze.py`: learning curves, diagnostic heuristics and error galleries.
+- `compare.py`: quality, CPU latency, training duration and model file size.
+- `run_experiments.py`: run each model, analyze it, then compare the reports.
+
+All models share the same stratified split function. Dataset contents and test
+samples have signatures. Normalization and scaling are fitted only on train.
+
 ## Image classifier
 
 Input images are RGB paintings of shape `3 × 128 × 128`. Use a small CNN with ReLU
@@ -21,14 +40,14 @@ then compare validation results before tuning model depth, activation, or regula
 
 ## Data and evaluation flow
 
-1. Load `data/wikiart_styles/` with `torchvision.datasets.ImageFolder`; its sorted class
+1. Load `data/wikiart_style5/` with `torchvision.datasets.ImageFolder`; its sorted class
    folders define the labels.
-2. Create a reproducible, stratified 70/15/15 train/validation/test split. With 200
-   images per class, this gives 140/30/30 per style. Apply any augmentation to training
+2. Create a reproducible, stratified 70/15/15 train/validation/test split. With 300
+   images per class, this gives 210/45/45 per style. Apply any augmentation to training
    images only.
 3. Train in mini-batches. Record train loss, validation loss, and validation accuracy
    each epoch, following TP05's `fit` workflow. Save the checkpoint with the best
-   validation score under `checkpoints/`.
+   validation loss under `checkpoints/`.
 4. Evaluate the selected model once on the held-out test split. Report accuracy and a
    confusion matrix, then inspect misclassified examples as in TP05.
 5. Record the random seed, split method, model settings, and final metrics in the report.
@@ -47,15 +66,13 @@ Deep Learning project/
 ├── README.md
 ├── requirements.txt
 ├── pyproject.toml              # install the src/ package in editable mode
-├── make_wikiart_subset.py      # reproducible dataset preparation
 ├── data/                       # local, ignored
-│   └── wikiart_styles/         # 5 classes × 200 images, metadata, subset info
+│   └── wikiart_style5/         # 5 classes × 300 images, metadata, subset info
 ├── notebooks/                  # exploration and course experiments
-├── src/wikiart/                # data.py, model.py, train.py, evaluate.py
+├── src/wikiart/                # models, training, evaluation, analysis, comparison
 ├── checkpoints/                # saved weights, ignored
-└── reports/figures/            # plots and confusion matrices
+└── reports/                    # metrics, plots, diagnostics and CPU comparison
 ```
 
-The course notebook remains one directory above this project at
-`../TP05_vision_project.ipynb`; it is the reference for the training and evaluation
+The course notebook is stored at `TP05_vision_project.ipynb`; it is the reference for the training and evaluation
 workflow, not a model to apply unchanged to the RGB paintings.

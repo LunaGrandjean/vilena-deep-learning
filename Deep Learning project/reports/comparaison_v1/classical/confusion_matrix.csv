@@ -1,0 +1,6 @@
+true / predicted,Baroque,Cubism,Impressionism,Pop_Art,Ukiyo_e
+Baroque,30,7,3,1,4
+Cubism,9,7,9,8,12
+Impressionism,15,6,12,3,9
+Pop_Art,7,10,6,15,7
+Ukiyo_e,0,4,4,7,30

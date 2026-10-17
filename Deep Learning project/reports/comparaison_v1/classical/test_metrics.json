@@ -1,0 +1,102 @@
+{
+  "test_loss": 1.482682843714163,
+  "test_accuracy": 0.4177777777777778,
+  "classification_report": {
+    "Baroque": {
+      "precision": 0.4918032786885246,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.5660377358490566,
+      "support": 45.0
+    },
+    "Cubism": {
+      "precision": 0.20588235294117646,
+      "recall": 0.15555555555555556,
+      "f1-score": 0.17721518987341772,
+      "support": 45.0
+    },
+    "Impressionism": {
+      "precision": 0.35294117647058826,
+      "recall": 0.26666666666666666,
+      "f1-score": 0.3037974683544304,
+      "support": 45.0
+    },
+    "Pop_Art": {
+      "precision": 0.4411764705882353,
+      "recall": 0.3333333333333333,
+      "f1-score": 0.379746835443038,
+      "support": 45.0
+    },
+    "Ukiyo_e": {
+      "precision": 0.4838709677419355,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.5607476635514018,
+      "support": 45.0
+    },
+    "accuracy": 0.4177777777777778,
+    "macro avg": {
+      "precision": 0.39513484928609205,
+      "recall": 0.4177777777777777,
+      "f1-score": 0.3975089786142689,
+      "support": 225.0
+    },
+    "weighted avg": {
+      "precision": 0.395134849286092,
+      "recall": 0.4177777777777778,
+      "f1-score": 0.3975089786142689,
+      "support": 225.0
+    }
+  },
+  "metadata": {
+    "model": "classical",
+    "seed": 0,
+    "dataset_signature": "07dd1bd2f78cc0b633b74ac2149d9e3d00b82da3d2003e3807fea8ca203b56b6",
+    "training": {
+      "model": "classical",
+      "seed": 0,
+      "device": "cpu",
+      "threads": 1,
+      "features": "16x16 RGB pixels and 32-bin histograms for each RGB channel (864 features)",
+      "feature_extraction_train_val_seconds": 0.97197960000085,
+      "training_seconds": 1.4310665000011795,
+      "training_timing_scope": "Scaler fits, all C candidates and validation; excludes image features",
+      "selected_C": 0.01,
+      "validation_candidates": [
+        {
+          "C": 0.01,
+          "validation_loss": 1.4500583410263062,
+          "validation_accuracy": 0.38222222222222224
+        },
+        {
+          "C": 0.1,
+          "validation_loss": 1.986158013343811,
+          "validation_accuracy": 0.3688888888888889
+        },
+        {
+          "C": 1,
+          "validation_loss": 3.6081857681274414,
+          "validation_accuracy": 0.31555555555555553
+        },
+        {
+          "C": 10,
+          "validation_loss": 5.681253910064697,
+          "validation_accuracy": 0.3333333333333333
+        }
+      ],
+      "split_counts": {
+        "train": 1050,
+        "validation": 225,
+        "test": 225
+      },
+      "dataset_signature": "07dd1bd2f78cc0b633b74ac2149d9e3d00b82da3d2003e3807fea8ca203b56b6"
+    },
+    "classes": [
+      "Baroque",
+      "Cubism",
+      "Impressionism",
+      "Pop_Art",
+      "Ukiyo_e"
+    ],
+    "test_count": 225,
+    "test_signature": "0b1dc18ea16b85b3c57fc3eddd01ebe7d6839e42bce47f0d633cdd6e460341db"
+  }
+}
