@@ -14,9 +14,9 @@ from .model import WikiArtMLP
 from .train import set_seed, train_one_epoch, evaluate
 
 #SETTINGS
-EPOCHS = 20            # how many full passes through the training images
+EPOCHS = 50         # how many full passes through the training images
 LEARNING_RATE = 1e-3   # step size of the optimizer (same as the CNN, for a fair comparison)
-IMAGE_SIZE = 64        # 64x64 instead of 128x128: 12,288 inputs instead of 49,152
+IMAGE_SIZE = 128       # 64x64 instead of 128x128: 12,288 inputs instead of 49,152
 SEED = 0               # same seed as the CNN -> same train/val/test split
 RUN_TEST = True        # True only for the final model, False for experiments (128px)
 OUTPUT_DIR = Path("reports/mlp")
@@ -84,9 +84,12 @@ def main():
         # One dot per epoch on each line
         ax.plot(epochs, train_values, marker="o", label="train")
         ax.plot(epochs, val_values, marker="o", label="validation")
+        ax.axvline(best_epoch, color="gray", linestyle="--", label=f"best epoch ({best_epoch})")
 
         # values for each dot
         for x, y_train, y_val in zip(epochs, train_values, val_values):
+            if EPOCHS > 20 and x % 5 != 0:
+                continue
             if as_percent:
                 text_train, text_val = f"{y_train * 100:.0f}", f"{y_val * 100:.0f}"   # 0.372 -> "37"
             else:
@@ -98,7 +101,12 @@ def main():
 
         ax.set_title(title)
         ax.set_xlabel("epoch")
-        ax.set_xticks(epochs)    # epoch number on x 
+        
+        if EPOCHS > 20:
+            ax.set_xticks([1] + list(range(5, EPOCHS + 1, 5)))   # 1, 5, 10, 15 
+        else:
+            ax.set_xticks(epochs) # every epoch 
+            
         ax.grid(alpha=0.3)      
         ax.legend()
 
