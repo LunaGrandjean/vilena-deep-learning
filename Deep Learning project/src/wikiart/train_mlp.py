@@ -16,9 +16,9 @@ from .train import set_seed, train_one_epoch, evaluate
 #SETTINGS
 EPOCHS = 50         # how many full passes through the training images
 LEARNING_RATE = 1e-3   # step size of the optimizer (same as the CNN, for a fair comparison)
-IMAGE_SIZE = 128       # 64x64 instead of 128x128: 12,288 inputs instead of 49,152
+IMAGE_SIZE = 64       # 64x64 instead of 128x128: 12,288 inputs instead of 49,152
 SEED = 0               # same seed as the CNN -> same train/val/test split
-RUN_TEST = True        # True only for the final model, False for experiments (128px)
+RUN_TEST = True        
 OUTPUT_DIR = Path("reports/mlp")
 
 
