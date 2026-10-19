@@ -17,7 +17,7 @@ from .train import set_seed, train_one_epoch, evaluate
 #SETTINGS (identical for every run, so the runs can be compared)
 EPOCHS = 50            # how many full passes through the training images
 LEARNING_RATE = 1e-3   # step size of the optimizer (same as the CNN, for a fair comparison)
-IMAGE_SIZE = 64        # 64x64 images: 12,288 inputs per image
+IMAGE_SIZE = 128        # 64x64 images: 12,288 inputs per image
 SEED = 0               # same seed as the CNN -> same train/val/test split
 OUTPUT_DIR = Path("reports/mlp")
 
