@@ -1,5 +1,6 @@
 ﻿"""ImageFolder loading with a reproducible stratified split and TP05-style normalization."""
 
+import hashlib
 from pathlib import Path
 
 from sklearn.model_selection import train_test_split
@@ -7,14 +8,43 @@ import torch
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+DEFAULT_DATA_DIR = PROJECT_DIR / "data" / "wikiart_style5"
+
+
+def dataset_signature(dataset):
+    """Identify filenames, labels and actual image contents, independent of root."""
+    digest = hashlib.sha256()
+    for path, label in dataset.samples:
+        relative = Path(path).relative_to(dataset.root).as_posix()
+        digest.update(f"{relative}|{label}\n".encode())
+        digest.update(hashlib.sha256(Path(path).read_bytes()).digest())
+    return digest.hexdigest()
+
+
+def split_indices(targets, seed=0):
+    """Shared stratified 70/15/15 split for neural and classical models."""
+    indices = list(range(len(targets)))
+    train_val, test = train_test_split(
+        indices, test_size=0.15, random_state=seed, stratify=targets
+    )
+    train, val = train_test_split(
+        # Integer size avoids ceil(85 * (0.15 / 0.85)) becoming 16 due to rounding.
+        train_val, test_size=len(test), random_state=seed,
+        stratify=[targets[i] for i in train_val],
+    )
+    return train, val, test
+
 
 def create_dataloaders(
-    data_dir: str | Path = "data/wikiart_styles",
+    data_dir: str | Path = DEFAULT_DATA_DIR,
     batch_size: int = 32,
     image_size: int = 128,
     seed: int = 0,
     num_workers: int = 0,
     normalization: str = "half",
+    normalization_stats: dict | None = None,
+    augment: bool = True,
 ):
     """Return train, validation, test loaders and sorted ImageFolder class names.
 
@@ -30,20 +60,11 @@ def create_dataloaders(
     if len(index_dataset.classes) < 2:
         raise ValueError(f"Expected at least two class folders in {data_dir}")
 
-    indices = list(range(len(index_dataset.samples)))
-    targets = index_dataset.targets
-    train_val_indices, test_indices = train_test_split(
-        indices, test_size=0.15, random_state=seed, stratify=targets
-    )
-    train_targets = [targets[i] for i in train_val_indices]
-    train_indices, val_indices = train_test_split(
-        train_val_indices,
-        test_size=0.15 / 0.85,
-        random_state=seed,
-        stratify=train_targets,
-    )
+    train_indices, val_indices, test_indices = split_indices(index_dataset.targets, seed)
 
-    if normalization == "train":
+    if normalization_stats is not None:
+        normalize = transforms.Normalize(**normalization_stats)
+    elif normalization == "train":
         stats_dataset = datasets.ImageFolder(
             data_dir,
             transform=transforms.Compose(
@@ -87,7 +108,7 @@ def create_dataloaders(
     train_transform = transforms.Compose(
         [
             *resize_crop,
-            transforms.RandomHorizontalFlip(p=0.5),
+            *([transforms.RandomHorizontalFlip(p=0.5)] if augment else []),
             transforms.ToTensor(),
             normalize,
         ]

@@ -1,0 +1,28 @@
+{
+  "model_only": {
+    "median_ms": 7.029350000266277,
+    "p95_ms": 7.886974999701123,
+    "mean_ms": 7.084643999951368
+  },
+  "end_to_end": {
+    "median_ms": 7.669850000183942,
+    "p95_ms": 8.40676000007079,
+    "mean_ms": 7.704828000078123
+  },
+  "repeats": 50,
+  "warmup": 5,
+  "threads": 1,
+  "batch_size": 1,
+  "platform": "Windows-10-10.0.26300-SP0",
+  "processor": "Intel64 Family 6 Model 189 Stepping 1, GenuineIntel",
+  "python": "3.11.6",
+  "torch": "2.14.1+cpu",
+  "note": "Warm process and OS file cache; excludes model loading. End-to-end includes JPEG decode, preprocessing and prediction. Desktop measurements must be repeated on the target kiosk CPU.",
+  "model": "cnn",
+  "dataset_signature": "07dd1bd2f78cc0b633b74ac2149d9e3d00b82da3d2003e3807fea8ca203b56b6",
+  "test_signature": "0b1dc18ea16b85b3c57fc3eddd01ebe7d6839e42bce47f0d633cdd6e460341db",
+  "parameter_count": 94117,
+  "artifact_bytes": 386293,
+  "training_seconds": 1006.8595734999999,
+  "training_device": "cpu"
+}
