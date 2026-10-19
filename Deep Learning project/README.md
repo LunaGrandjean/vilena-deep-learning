@@ -15,6 +15,13 @@ Tous les résultats MLP sont regroupés dans `reports/mlp/` : essais de Viviam
 à la racine, futurs résultats dans `runs/`, ancien MLP de Luna dans
 `archives/luna_32px/`. Les tableaux `comparaison_v1` restent historiques.
 
+La dernière étude de Viviam compare sept configurations MLP (dropout, weight
+decay et taille des couches). Son MLP choisi atteint **36,0 % sur son test
+historique**, avec dropout 0,5. Lire le
+[diagnostic MLP](reports/mlp/Diagnosis_MLP.md) et sa
+[comparaison de validation](reports/mlp/comparison.md). Ce résultat utilise
+son ancien partage 1 049/226/225, et ne remplace pas le nouveau run commun.
+
 ## Données et protocole
 
 Les données locales sont dans **`Deep Learning project/data/wikiart_style5/`** :
@@ -101,6 +108,16 @@ python -m wikiart.train_mlp --image-size 128 --dropout 0.0
 Chaque réglage dispose de son dossier sous `reports/mlp/runs/`, avec historique
 JSON, résumé et courbes annotées. Le checkpoint et `run.json` sont aussi conservés.
 Le script refuse les chemins de sortie déjà existants.
+
+Le comparateur MLP de Viviam est également disponible :
+
+```powershell
+python -m wikiart.compare_mlp --output-dir reports/mlp/comparisons/viviam
+```
+
+Par défaut, il lit ses sept résumés historiques directement dans `reports/mlp`.
+Pour comparer de nouveaux runs, passer leurs dossiers avec `--run-dirs` et un
+`--output-dir` dédié. Les historiques ne sont pas mélangés avec le protocole commun.
 
 Pour mesurer seulement le nouveau MLP choisi, sans réentraîner CNN/ResNet18/classique :
 

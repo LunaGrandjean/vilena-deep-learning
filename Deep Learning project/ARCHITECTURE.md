@@ -16,6 +16,10 @@ The [README](README.md) describes the current commands and full comparison.
   Original Viviam reports are archived unchanged in reports/mlp/.
   All MLP results share that root: new runs in reports/mlp/runs/ and historical
   Luna 32px results in reports/mlp/archives/luna_32px/.
+- `compare_mlp.py`: Viviam's seven-run regularization comparison, with table and
+  combined curves. Explicit run directories are supported; mismatched protocols
+  and mixtures of historical/integrated reports are rejected. Her historical
+  dropout-0.5 model achieves 36.0% test accuracy on the older 1049/226/225 split.
 - ResNet18: ImageNet initialization, 224x224 input, fine-tuned last residual
   block and classifier; earlier weights and BatchNorm statistics remain fixed.
 - Classical reference: standardized 16x16 RGB pixels and color histograms,

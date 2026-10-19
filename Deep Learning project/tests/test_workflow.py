@@ -20,6 +20,7 @@ from torchvision.datasets import ImageFolder
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from wikiart import analyze, classical, evaluate, run_experiments, train, train_mlp
 from wikiart.compare import compare_reports
+from wikiart.compare_mlp import describe, load_runs
 from wikiart.data import dataset_signature, split_indices
 from wikiart.model import build_model, load_model_state
 
@@ -44,6 +45,28 @@ class WorkflowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         torch.set_num_threads(1)
+
+    def test_mlp_study_refuses_mixed_historical_and_common_protocols(self):
+        with tempfile.TemporaryDirectory(prefix="wikiart-study-test-") as temp:
+            root = Path(temp)
+            folders = [root / "historical", root / "integrated"]
+            history = {"train_loss": [2.0, 1.0], "val_loss": [2.0, 1.5],
+                       "train_acc": [0.2, 0.7], "val_acc": [0.2, 0.4]}
+            for folder, dropout in zip(folders, ("0.0", "0.5")):
+                folder.mkdir()
+                name = f"64px_h256-128_dropout{dropout}_wd0.0"
+                summary = {"run": name, "best_epoch": 2}
+                if folder.name == "integrated":
+                    summary["training"] = {"dataset_signature": "synthetic-data", "seed": 0,
+                                           "split_counts": {"train": 70, "validation": 15, "test": 15},
+                                           "normalization": "half"}
+                (folder / f"summary_{name}.json").write_text(json.dumps(summary), encoding="utf-8")
+                (folder / f"history_{name}.json").write_text(json.dumps(history), encoding="utf-8")
+            self.assertEqual(len(load_runs([folders[0]])), 1)
+            self.assertEqual(len(load_runs([folders[1]])), 1)
+            with self.assertRaisesRegex(ValueError, "mix historical"):
+                load_runs(folders)
+            self.assertIn("seed 1", describe("64px_h256-128_dropout0.5_wd1e-05_seed1"))
 
     def test_runner_uses_central_mlp_folder_and_refuses_overwrite(self):
         with tempfile.TemporaryDirectory(prefix="wikiart-routing-test-") as temp:

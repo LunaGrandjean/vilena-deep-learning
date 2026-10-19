@@ -1,8 +1,10 @@
 # Expériences MLP de Viviam — résultats historiques
 
-Les quatorze fichiers JSON/PNG de ce dossier sont repris sans modification de
-la branche `vivi`, commit `d395106` (« MLP: dropout 0.5 run at 64px »).
-Ils documentent les essais de Viviam avant l'intégration dans la branche `luna`.
+Les résultats proviennent de la branche `vivi`, jusqu'au commit `55a86d5`
+(« MLP: failure diagnosis report »), avec les essais de régularisation du commit
+`3857f2c`. Les JSON et PNG sont repris sans modification. Le diagnostic a ses
+liens corrigés et des formulations précisées pour distinguer observations,
+hypothèses et sélection d'un checkpoint sans arrêt anticipé de l'entraînement.
 
 Ce dossier est l'unique point d'entrée pour les résultats MLP :
 
@@ -21,7 +23,19 @@ modèle à utiliser.
 |---|---:|---:|
 | 64 px, couches 256/128, sans dropout | 36,7 % | 31,1 % |
 | 128 px, expérience initiale | 43,8 % | 40,9 % |
-| 64 px, couches 256/128, dropout 0,5 | 44,7 % | Non évalué dans les fichiers fournis |
+| 64 px, couches 256/128, dropout 0,5 | 44,7 % | **36,0 %** |
+| 64 px, couches 256/128, weight decay 0,01 | 37,6 % | Non évalué |
+| 64 px, couches 256/128, weight decay 0,1 | 39,8 % | Non évalué |
+| 64 px, couches 256/128, weight decay 1,0 | 39,4 % | Non évalué |
+| 64 px, couches 256/128, dropout 0,5 + weight decay 1,0 | 42,9 % | Non évalué |
+| 64 px, couches 64/32, sans dropout ni weight decay | 40,7 % | Non évalué |
+
+Les sept configurations à 64 pixels sont comparées dans
+[comparison.md](comparison.md) et les graphiques associés. Le bilan détaillé
+est dans [Diagnosis_MLP.md](Diagnosis_MLP.md). Le profil dropout 0,5 seul reste
+celui retenu par Viviam et par le lanceur intégré. La combinaison a une perte
+de validation légèrement inférieure, mais une accuracy à cette époque plus
+basse : le choix du profil simple ne prouve pas une équivalence statistique.
 
 Le script original normalise les pixels avec moyenne/écart-type fixés à 0,5.
 Son ancien calcul du partage donne 1 049 images train, 226 validation et 225
@@ -40,6 +54,9 @@ Le lanceur complet choisit maintenant le profil **64 px, 256/128, dropout 0,5,
 AdamW, weight decay 0, normalisation 0,5**. Ce profil doit être exécuté sous le
 protocole commun avant d'annoncer une nouvelle comparaison à quatre modèles.
 Le 44,7 % ci-dessus est un score de validation historique, pas son score test.
+Le score test historique est désormais disponible : 36,0 %, soit 81 bonnes
+réponses sur 225 images, à l'époque 50. Il n'inclut pas de mesure CPU et ne
+remplace pas une exécution signée sous le protocole commun.
 
 Le script accepte aussi `--image-size`, `--hidden1`, `--hidden2`, `--dropout`
 et `--weight-decay` pour reproduire la démarche d'étude de Viviam.
@@ -47,3 +64,13 @@ Sans `--test`, aucune prédiction sur le test n'est calculée. Avec `--test`,
 le meilleur checkpoint est évalué avec les diagnostics et le benchmark CPU.
 Les nouveaux rapports sont créés dans `reports/mlp/runs/<réglages>/` par défaut,
 ou dans le chemin explicite `--output-dir`, sans écraser ces archives.
+
+Pour régénérer la comparaison historique de Viviam dans un dossier séparé :
+
+```powershell
+python -m wikiart.compare_mlp --output-dir reports/mlp/comparisons/viviam
+```
+
+Pour comparer de nouvelles expériences, utiliser `--run-dirs` avec les dossiers
+précis sous `reports/mlp/runs/`. Le comparateur refuse de mélanger archives et
+nouveaux runs, ou des données, séparations, normalisations ou graines différentes.
