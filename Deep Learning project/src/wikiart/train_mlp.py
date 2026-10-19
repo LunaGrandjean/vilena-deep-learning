@@ -3,6 +3,7 @@
 import json
 import copy
 from pathlib import Path
+import argparse
 
 import matplotlib.pyplot as plt
 import torch
@@ -13,16 +14,26 @@ from .data import create_dataloaders
 from .model import WikiArtMLP
 from .train import set_seed, train_one_epoch, evaluate
 
-#SETTINGS
-EPOCHS = 50         # how many full passes through the training images
+#SETTINGS (identical for every run, so the runs can be compared)
+EPOCHS = 50            # how many full passes through the training images
 LEARNING_RATE = 1e-3   # step size of the optimizer (same as the CNN, for a fair comparison)
-IMAGE_SIZE = 64       # 64x64 instead of 128x128: 12,288 inputs instead of 49,152
+IMAGE_SIZE = 64        # 64x64 images: 12,288 inputs per image
 SEED = 0               # same seed as the CNN -> same train/val/test split
-RUN_TEST = True        
 OUTPUT_DIR = Path("reports/mlp")
 
 
 def main():
+    # 0. SETTINGS FOR THIS RUN: change ONE thing at a time, everything else stays identical   # NEW
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dropout", type=float, default=0.0)        # probability of switching a neuron off
+    parser.add_argument("--weight-decay", type=float, default=0.0)   # L2 penalty (weight decay)-- ridge
+    parser.add_argument("--hidden1", type=int, default=256)          # size of hidden layer 1
+    parser.add_argument("--hidden2", type=int, default=128)          # size of hidden layer 2
+    parser.add_argument("--test", action="store_true")               # evaluate on test: FINAL model only
+    args = parser.parse_args()
+    run_name = f"{IMAGE_SIZE}px_h{args.hidden1}-{args.hidden2}_dropout{args.dropout}_wd{args.weight_decay}"
+    print(f"run: {run_name}")
+
     # 1. Fix the randomness so the run is reproducible
     set_seed(SEED)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,8 +45,9 @@ def main():
         seed=SEED,
     )
 
-    # 3. MODEL MLP
-    model = WikiArtMLP(num_classes=len(classes), image_size=IMAGE_SIZE).to(device)
+    # 3. MODEL MLP (sizes and dropout come from the command line)                              
+    model = WikiArtMLP(num_classes=len(classes), image_size=IMAGE_SIZE,
+                       hidden1=args.hidden1, hidden2=args.hidden2, dropout=args.dropout).to(device)
     n_params = sum(p.numel() for p in model.parameters())
     print(f"device: {device} | classes: {classes}")
     print(f"MLP trainable parameters: {n_params:,}")
@@ -43,8 +55,9 @@ def main():
     # 4. COST FUNCTION: cross-entropy on the raw logits (it applies softmax internally)
     loss_fn = nn.CrossEntropyLoss()
 
-    # 5. OPTIMIZER: Adam >> a version of gradient descent
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    # 5. OPTIMIZER: AdamW = Adam + weight decay applied correctly.                          
+    #    With weight_decay=0 it is exactly plain Adam.
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=args.weight_decay)
 
     # 6. TRAINING LOOP: one epoch = one pass over all training images
     #    (train_one_epoch does zero_grad -> forward -> loss -> backward -> step for each batch)
@@ -52,7 +65,7 @@ def main():
     best_val_loss = float("inf")
     best_epoch = 0
     best_weights = None
-    
+
     for epoch in range(EPOCHS):
         train_loss, train_acc = train_one_epoch(model, train_loader, loss_fn, optimizer, device)
         val_loss, val_acc = evaluate(model, val_loader, loss_fn, device)
@@ -61,7 +74,8 @@ def main():
         history["train_acc"].append(train_acc)
         history["val_loss"].append(val_loss)
         history["val_acc"].append(val_acc)
-        
+
+        # EARLY STOPPING: remember the weights of the epoch with the lowest validation loss
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_epoch = epoch + 1
@@ -74,7 +88,28 @@ def main():
 
     # 7. numbers (evidence for the report)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUTPUT_DIR / f"history_{IMAGE_SIZE}px.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
+    (OUTPUT_DIR / f"history_{run_name}.json").write_text(json.dumps(history, indent=2), encoding="utf-8")   
+
+    # 7b. SUMMARY of this run, to compare the runs in one table                                 
+    b = best_epoch - 1                      # list index of the best epoch
+    summary = {
+        "run": run_name,
+        "parameters": n_params,
+        "best_epoch": best_epoch,
+        "val_loss_at_best": history["val_loss"][b],
+        "val_acc_at_best": history["val_acc"][b],
+        "train_acc_at_best": history["train_acc"][b],
+        "gap_at_best": history["train_acc"][b] - history["val_acc"][b],   # train - validation accuracy
+        "final_train_acc": history["train_acc"][-1],
+        "final_val_loss": history["val_loss"][-1],
+        "final_val_acc": history["val_acc"][-1],
+    }
+    (OUTPUT_DIR / f"summary_{run_name}.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    print(
+        f"SUMMARY {run_name} | best epoch {best_epoch} | val loss {summary['val_loss_at_best']:.3f} "
+        f"| val acc {summary['val_acc_at_best']:.3f} | train acc {summary['train_acc_at_best']:.3f} "
+        f"| gap {summary['gap_at_best']:.3f} | final val loss {summary['final_val_loss']:.3f}"
+    )
 
     # 8. learning curves (train vs validation)
     epochs = list(range(1, EPOCHS + 1))
@@ -101,26 +136,26 @@ def main():
 
         ax.set_title(title)
         ax.set_xlabel("epoch")
-        
+
         if EPOCHS > 20:
-            ax.set_xticks([1] + list(range(5, EPOCHS + 1, 5)))   # 1, 5, 10, 15 
+            ax.set_xticks([1] + list(range(5, EPOCHS + 1, 5)))   # 1, 5, 10, 15
         else:
-            ax.set_xticks(epochs) # every epoch 
-            
-        ax.grid(alpha=0.3)      
+            ax.set_xticks(epochs) # every epoch
+
+        ax.grid(alpha=0.3)
         ax.legend()
 
     plot_with_labels(ax_loss, history["train_loss"], history["val_loss"],
-                     f"MLP ({IMAGE_SIZE}px) - loss", as_percent=False)
+                     f"MLP ({run_name}) - loss", as_percent=False)                
     plot_with_labels(ax_acc, history["train_acc"], history["val_acc"],
-                     f"MLP ({IMAGE_SIZE}px) - accuracy (%)", as_percent=True)
+                     f"MLP ({run_name}) - accuracy (%)", as_percent=True)         
 
     fig.tight_layout()
-    fig.savefig(OUTPUT_DIR / f"curves_{IMAGE_SIZE}px.png", dpi=150)
-    print(f"Curves saved to {OUTPUT_DIR}/curves_{IMAGE_SIZE}px.png")
+    fig.savefig(OUTPUT_DIR / f"curves_{run_name}.png", dpi=150)                   
+    print(f"Curves saved to {OUTPUT_DIR}/curves_{run_name}.png")                  
 
-    # 9. TEST: only for the final model 64x64, using the weights of the best epoch
-    if RUN_TEST:
+    # 9. TEST: only for the FINAL chosen model (--test), using the weights of the best epoch   
+    if args.test:
         model.load_state_dict(best_weights)
         test_loss, test_acc = evaluate(model, test_loader, loss_fn, device)
         print(f"best epoch {best_epoch} | test loss {test_loss:.4f} | test acc {test_acc:.3f}")
@@ -141,8 +176,8 @@ def main():
             "test_accuracy": test_acc,
             "confusion_matrix": matrix.tolist(),
         }
-        (OUTPUT_DIR / f"test_metrics_{IMAGE_SIZE}px.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
-        
+        (OUTPUT_DIR / f"test_metrics_{run_name}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")   
+
         fig, ax = plt.subplots(figsize=(7, 6))
         ax.imshow(matrix, cmap="Blues")
         for i in range(len(classes)):
@@ -152,10 +187,10 @@ def main():
         ax.set_yticks(range(len(classes)), labels=classes)
         ax.set_xlabel("predicted style")
         ax.set_ylabel("true style")
-        ax.set_title(f"MLP ({IMAGE_SIZE}px) - test confusion matrix")
+        ax.set_title(f"MLP ({run_name}) - test confusion matrix")                 
         fig.tight_layout()
-        fig.savefig(OUTPUT_DIR / f"confusion_matrix_{IMAGE_SIZE}px.png", dpi=150)
-        
+        fig.savefig(OUTPUT_DIR / f"confusion_matrix_{run_name}.png", dpi=150)     
+
+
 if __name__ == "__main__":
     main()
-    

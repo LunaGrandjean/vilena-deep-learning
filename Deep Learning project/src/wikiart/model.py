@@ -53,7 +53,7 @@ class WikiArtCNN(nn.Module):
 ##Feed-forward network (MLP): flatten the image, then fully connected layers
 class WikiArtMLP(nn.Module):
 
-    def __init__(self, num_classes: int, image_size: int = 64, hidden1: int = 256, hidden2: int = 128):
+    def __init__(self, num_classes: int, image_size: int = 64, hidden1: int = 256, hidden2: int = 128, dropout: float = 0.0):
         super().__init__()
         n_inputs = 3 * image_size * image_size   # 3 colors x 64 x 64 = 12,288 numbers per image
 
@@ -62,6 +62,7 @@ class WikiArtMLP(nn.Module):
         self.layer2 = nn.Linear(hidden1, hidden2)       # 256 -> 128
         self.output = nn.Linear(hidden2, num_classes)   # 128 -> 5 logits (one per style)
         self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=dropout)   #during training, each hidden neuron is switched off with probability p
 
         # He initialization for the ReLU layers (keeps signals stable from layer to layer)
         for layer in [self.layer1, self.layer2]:
@@ -70,6 +71,6 @@ class WikiArtMLP(nn.Module):
 
     def forward(self, images):
         x = self.flatten(images)
-        x = self.relu(self.layer1(x))   # Z1 = W1·X + b1, then A1 = ReLU(Z1)
-        x = self.relu(self.layer2(x))   # Z2 = W2·A1 + b2, then A2 = ReLU(Z2)
+        x = self.dropout(self.relu(self.layer1(x)))   # A1 = ReLU(Z1), then dropout
+        x = self.dropout(self.relu(self.layer2(x)))   # A2 = ReLU(Z2), then dropout
         return self.output(x)           # raw logits 
