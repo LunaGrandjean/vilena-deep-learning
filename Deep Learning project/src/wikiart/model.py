@@ -14,26 +14,40 @@ def _conv_block(in_channels: int, out_channels: int) -> nn.Sequential:
 
 
 class WikiArtMLP(nn.Module):
-    """Flatten RGB pixels, then learn two dense hidden layers from scratch."""
+    """Viviam's dense network: two independently configurable hidden layers."""
 
-    def __init__(self, num_classes, image_size=32, hidden_dim=256, dropout=0.3):
+    def __init__(self, num_classes, image_size=64, hidden1=256, hidden2=128, dropout=0.0):
         super().__init__()
-        if num_classes < 2 or image_size < 1 or hidden_dim < 2:
+        if num_classes < 2 or image_size < 1 or hidden1 < 1 or hidden2 < 1:
             raise ValueError("Invalid MLP dimensions")
-        self.layers = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(3 * image_size * image_size, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim // 2, num_classes),
-        )
-        self.apply(WikiArtCNN._initialize)
+        if not 0 <= dropout < 1:
+            raise ValueError("dropout must be in [0, 1)")
+        self.flatten = nn.Flatten()
+        self.layer1 = nn.Linear(3 * image_size * image_size, hidden1)
+        self.layer2 = nn.Linear(hidden1, hidden2)
+        self.output = nn.Linear(hidden2, num_classes)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+        # Preserve Viviam's initialization: He for hidden layers, PyTorch's
+        # default initialization for the output layer.
+        for layer in (self.layer1, self.layer2):
+            nn.init.kaiming_normal_(layer.weight, nonlinearity="relu")
+            nn.init.zeros_(layer.bias)
 
     def forward(self, images):
-        return self.layers(images)
+        features = self.flatten(images)
+        features = self.dropout(self.relu(self.layer1(features)))
+        features = self.dropout(self.relu(self.layer2(features)))
+        return self.output(features)
+
+
+def load_model_state(model, state):
+    """Keep Luna's historical MLP checkpoints readable after adopting Viv's names."""
+    if isinstance(model, WikiArtMLP) and "layers.1.weight" in state:
+        names = {"layers.1": "layer1", "layers.4": "layer2", "layers.7": "output"}
+        state = {f"{names[key.rsplit('.', 1)[0]]}.{key.rsplit('.', 1)[1]}": value
+                 for key, value in state.items()}
+    model.load_state_dict(state)
 
 
 class WikiArtCNN(nn.Module):
@@ -87,10 +101,14 @@ def build_model(
     pretrained: bool = False,
     image_size: int = 128,
     hidden_dim: int = 256,
+    hidden1: int | None = None,
+    hidden2: int | None = None,
 ) -> nn.Module:
     """Output raw logits; CrossEntropyLoss applies log-softmax internally."""
     if architecture == "mlp":
-        return WikiArtMLP(num_classes, image_size, hidden_dim, dropout)
+        first = hidden_dim if hidden1 is None else hidden1
+        second = first // 2 if hidden2 is None else hidden2
+        return WikiArtMLP(num_classes, image_size, first, second, dropout)
     if architecture == "cnn":
         return WikiArtCNN(num_classes=num_classes, dropout=dropout, width=width)
     if architecture == "resnet18":

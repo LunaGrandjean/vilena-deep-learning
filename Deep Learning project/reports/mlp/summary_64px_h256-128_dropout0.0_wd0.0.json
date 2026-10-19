@@ -1,0 +1,12 @@
+{
+  "run": "64px_h256-128_dropout0.0_wd0.0",
+  "parameters": 3179525,
+  "best_epoch": 2,
+  "val_loss_at_best": 1.5056246065460475,
+  "val_acc_at_best": 0.3672566371681416,
+  "train_acc_at_best": 0.42802669208770255,
+  "gap_at_best": 0.060770054919560945,
+  "final_train_acc": 0.9618684461391802,
+  "final_val_loss": 4.038601655875687,
+  "final_val_acc": 0.3805309734513274
+}

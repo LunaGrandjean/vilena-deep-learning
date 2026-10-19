@@ -18,10 +18,10 @@ from torchvision.datasets import ImageFolder
 
 # Also supports unittest before an editable package installation.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from wikiart import analyze, classical, evaluate, train
+from wikiart import analyze, classical, evaluate, run_experiments, train, train_mlp
 from wikiart.compare import compare_reports
 from wikiart.data import dataset_signature, split_indices
-from wikiart.model import build_model
+from wikiart.model import build_model, load_model_state
 
 
 def run_main(module, *arguments):
@@ -29,10 +29,86 @@ def run_main(module, *arguments):
         module.main()
 
 
+def make_images(data):
+    rng = np.random.default_rng(7)
+    for label in range(5):
+        folder = data / f"style_{label}"
+        folder.mkdir(parents=True)
+        for i in range(20):
+            pixels = rng.integers(0, 40, (16, 16, 3), dtype=np.uint8)
+            pixels[:, :, label % 3] += 100 + label * 15
+            Image.fromarray(pixels).save(folder / f"{i:02d}.png")
+
+
 class WorkflowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         torch.set_num_threads(1)
+
+    def test_runner_uses_central_mlp_folder_and_refuses_overwrite(self):
+        with tempfile.TemporaryDirectory(prefix="wikiart-routing-test-") as temp:
+            root = Path(temp)
+            arguments = ["--models", "mlp", "--run-name", "test_run"]
+            with patch.object(run_experiments, "PROJECT_DIR", root), \
+                    patch.object(run_experiments.subprocess, "run") as launch:
+                run_main(run_experiments, *arguments)
+                command = launch.call_args.args[0]
+                output_dir = command[command.index("--output-dir") + 1]
+                self.assertEqual(Path(output_dir), Path("reports/mlp/runs/test_run"))
+                (root / output_dir).mkdir(parents=True)
+                launch.reset_mock()
+                with redirect_stdout(io.StringIO()), patch.object(sys, "stderr", io.StringIO()), \
+                        self.assertRaises(SystemExit):
+                    run_main(run_experiments, *arguments)
+                launch.assert_not_called()
+
+    def test_historical_luna_mlp_checkpoint_keeps_identical_predictions(self):
+        legacy = torch.nn.Sequential(
+            torch.nn.Flatten(), torch.nn.Linear(3 * 16 * 16, 16),
+            torch.nn.ReLU(), torch.nn.Dropout(0.3), torch.nn.Linear(16, 8),
+            torch.nn.ReLU(), torch.nn.Dropout(0.3), torch.nn.Linear(8, 5),
+        ).eval()
+        old_state = {f"layers.{key}": value for key, value in legacy.state_dict().items()}
+        restored = build_model("mlp", 5, image_size=16, hidden_dim=16).eval()
+        load_model_state(restored, old_state)
+        batch = torch.rand(3, 3, 16, 16)
+        with torch.inference_mode():
+            torch.testing.assert_close(restored(batch), legacy(batch), rtol=0, atol=0)
+        self.assertIn("layers.1.weight", old_state)
+
+    def test_viv_mlp_exploration_and_final_evaluation(self):
+        with tempfile.TemporaryDirectory(prefix="wikiart-viv-test-") as temp:
+            root = Path(temp)
+            data = root / "images"
+            make_images(data)
+            for test_enabled in (False, True):
+                with self.subTest(test_enabled=test_enabled):
+                    destination = root / ("final" if test_enabled else "exploration")
+                    report = destination / "report"
+                    checkpoint = destination / "model.pt"
+                    arguments = ["--data-dir", data, "--image-size", 16,
+                                 "--hidden1", 16, "--hidden2", 7, "--dropout", 0.5,
+                                 "--weight-decay", 0.01, "--epochs", 1,
+                                 "--output-dir", report, "--checkpoint", checkpoint,
+                                 "--history", destination / "history.json", "--benchmark-repeats", 3]
+                    if test_enabled:
+                        run_main(train_mlp, *arguments, "--test")
+                        self.assertTrue((report / "test_metrics.json").is_file())
+                        self.assertTrue((report / "cpu_benchmark.json").is_file())
+                        self.assertTrue((report / "diagnostic.md").is_file())
+                    else:
+                        with patch.object(evaluate, "main", side_effect=AssertionError("Unexpected test evaluation")):
+                            run_main(train_mlp, *arguments)
+                        self.assertFalse((report / "test_metrics.json").exists())
+                    saved = torch.load(checkpoint, weights_only=True)
+                    self.assertEqual((saved["hidden1"], saved["hidden2"]), (16, 7))
+                    self.assertEqual(saved["dropout"], 0.5)
+                    self.assertEqual(saved["weight_decay"], 0.01)
+                    self.assertEqual(saved["optimizer"], "adamw")
+                    self.assertEqual(saved["normalization"], "half")
+                    self.assertEqual(len(list(report.glob("summary_*.json"))), 1)
+                    self.assertEqual(len(list(report.glob("history_*.json"))), 1)
+                    self.assertEqual(len(list(report.glob("curves_*.png"))), 1)
 
     def test_neural_architectures_have_finite_logits_and_gradients(self):
         for architecture, size in (("mlp", 16), ("cnn", 32), ("resnet18", 32)):
@@ -50,14 +126,7 @@ class WorkflowTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="wikiart-test-") as temp:
             root = Path(temp)
             data = root / "images"
-            rng = np.random.default_rng(7)
-            for label in range(5):
-                folder = data / f"style_{label}"
-                folder.mkdir(parents=True)
-                for i in range(20):
-                    pixels = rng.integers(0, 40, (16, 16, 3), dtype=np.uint8)
-                    pixels[:, :, label % 3] += 100 + label * 15
-                    Image.fromarray(pixels).save(folder / f"{i:02d}.png")
+            make_images(data)
             dataset = ImageFolder(data)
             train_indices, val_indices, test_indices = split_indices(dataset.targets, 0)
             self.assertEqual((len(train_indices), len(val_indices), len(test_indices)), (70, 15, 15))

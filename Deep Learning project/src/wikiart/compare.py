@@ -77,7 +77,7 @@ def compare_reports(report_dirs, output_dir):
                   "Les temps d'entraînement couvrent toutes les époques (et leurs validations) pour "
                   "les réseaux, et tous les candidats C pour la régression logistique. La préparation "
                   "des données/caractéristiques est séparée dans le CSV. Les architectures utilisent "
-                  "des prétraitements adaptés : MLP 32×32, CNN 128×128, ResNet18 224×224 ; les écarts "
+                  "des prétraitements adaptés (tailles et normalisation enregistrées dans leurs métadonnées) ; les écarts "
                   "reflètent donc les pipelines complets, pas seulement les architectures.", "",
                   "Pour recommander un modèle au musée, fixer d'abord la qualité minimale et le "
                   "budget de latence, puis confirmer ces mesures sur le CPU des bornes. "

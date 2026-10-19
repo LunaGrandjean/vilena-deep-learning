@@ -37,7 +37,10 @@ def main():
     # Refuse accidental replacement of historical or partially completed runs.
     for model in args.models:
         for parent in ("reports", "outputs", "checkpoints"):
-            target = PROJECT_DIR / parent / args.run_name / model
+            if parent == "reports" and model == "mlp":
+                target = PROJECT_DIR / "reports/mlp/runs" / args.run_name
+            else:
+                target = PROJECT_DIR / parent / args.run_name / model
             if target.exists():
                 parser.error(f"{target} already exists; choose a new --run-name")
 
@@ -47,10 +50,21 @@ def main():
         subprocess.run(command, cwd=PROJECT_DIR, env=env, check=True)
 
     for model in args.models:
-        report = Path("reports") / args.run_name / model
+        report = (Path("reports/mlp/runs") / args.run_name if model == "mlp"
+                  else Path("reports") / args.run_name / model)
         report_dirs.append(report)
         checkpoint_dir = Path("checkpoints") / args.run_name / model
         common = ["--data-dir", data_dir, "--seed", args.seed, "--threads", args.threads]
+        if model == "mlp":
+            # Adopt Viviam's 64px MLP and dropout study while retaining common
+            # evaluation, CPU timing and output directories for all models.
+            run("train_mlp", *common, "--epochs", args.epochs, "--device", args.device,
+                "--image-size", 64, "--hidden1", 256, "--hidden2", 128,
+                "--dropout", 0.5, "--weight-decay", 0.0, "--normalization", "half",
+                "--output-dir", report, "--checkpoint", checkpoint_dir / "best_model.pt",
+                "--history", Path("outputs") / args.run_name / model / "history.json",
+                "--benchmark-repeats", args.benchmark_repeats, "--test")
+            continue
         if model == "classical":
             run("classical", *common, "--output-dir", report,
                 "--checkpoint", checkpoint_dir / "model.joblib",
@@ -58,7 +72,6 @@ def main():
             run("analyze", "--data-dir", data_dir, "--report-dir", report)
             continue
         settings = {
-            "mlp": (32, "train", 0.001),
             "cnn": (128, "train", 0.001),
             "resnet18": (224, "imagenet", 0.0001),
         }

@@ -6,8 +6,16 @@ The [README](README.md) describes the current commands and full comparison.
 
 ## Additional models and analysis
 
-- `WikiArtMLP`: flattened 32x32 RGB pixels, dense layers of 256 and 128 units,
-  ReLU, Dropout(0.3), then five output logits.
+- `WikiArtMLP`: Viviam's independently configurable hidden layers, by default
+  256 and 128 units. The integrated runner selects 64x64 RGB, Dropout(0.5),
+  AdamW with zero weight decay and fixed 0.5 RGB normalization. Hidden-layer
+  initialization follows Viviam's implementation. Historical Luna 32px
+  checkpoints remain readable, and reports/comparaison_v1 remains unchanged.
+- `train_mlp.py`: Viviam's experiment settings, validation summaries and annotated
+  curves, using the common checkpoints, split, CPU evaluation and error reports.
+  Original Viviam reports are archived unchanged in reports/mlp/.
+  All MLP results share that root: new runs in reports/mlp/runs/ and historical
+  Luna 32px results in reports/mlp/archives/luna_32px/.
 - ResNet18: ImageNet initialization, 224x224 input, fine-tuned last residual
   block and classifier; earlier weights and BatchNorm statistics remain fixed.
 - Classical reference: standardized 16x16 RGB pixels and color histograms,

@@ -5,6 +5,16 @@ Le projet compare des modèles capables de reconnaître cinq styles de peinture 
 justifier un choix pour les bornes d'un musée en confrontant qualité de
 classification, coût sur CPU et complexité du modèle.
 
+La structure des modèles est décrite dans [ARCHITECTURE.md](ARCHITECTURE.md).
+Les résultats, figures et diagnostics sont disponibles dans `reports/`.
+
+Le MLP actif reprend désormais le travail de Viviam : deux couches configurables,
+AdamW, dropout et weight decay, résumés de validation et courbes annotées.
+Ses [expériences originales](reports/mlp/README.md) sont conservées.
+Tous les résultats MLP sont regroupés dans `reports/mlp/` : essais de Viviam
+à la racine, futurs résultats dans `runs/`, ancien MLP de Luna dans
+`archives/luna_32px/`. Les tableaux `comparaison_v1` restent historiques.
+
 ## Données et protocole
 
 Les données locales sont dans **`Deep Learning project/data/wikiart_style5/`** :
@@ -27,14 +37,15 @@ limite ; ces résultats ne mesurent pas la généralisation à des artistes inco
 
 | Modèle | Entrée / caractéristiques | Apprentissage |
 |---|---|---|
-| MLP dense | RGB 32 × 32 → vecteur de 3 072 pixels | `Linear(3072,256) → ReLU → Dropout → Linear(256,128) → ReLU → Dropout → Linear(128,5)`, depuis zéro |
+| MLP de Viviam | RGB 64 × 64 → vecteur de 12 288 pixels | `Linear(12288,256) → ReLU → Dropout(0.5) → Linear(256,128) → ReLU → Dropout(0.5) → Linear(128,5)`, depuis zéro ; couches et régularisation configurables |
 | Petit CNN | RGB 128 × 128 | Trois blocs convolution/BatchNorm/ReLU/pooling, puis classification, depuis zéro |
 | ResNet18 | RGB 224 × 224, normalisation ImageNet | Poids ImageNet ; dernier bloc résiduel et couche finale réentraînés |
 | Régression logistique | Pixels RGB 16 × 16 + histogrammes RGB de 32 cases par canal, soit 864 variables | Standardisation ajustée sur train uniquement ; `C` choisi sur validation parmi 0.01, 0.1, 1 et 10 |
 
 Les réseaux renvoient des logits, utilisés avec `CrossEntropyLoss` ; le softmax
-est appliqué pour exporter les probabilités. Les statistiques de normalisation
-train sont calculées uniquement sur l'entraînement et conservées dans le checkpoint.
+est appliqué pour exporter les probabilités. Le MLP reprend la normalisation
+fixe de Viviam (moyenne/écart-type 0,5), le CNN calcule ses statistiques sur train
+uniquement, et ResNet18 utilise ImageNet. Les valeurs sont conservées dans le checkpoint.
 Le retournement horizontal aléatoire est réservé aux images d'entraînement des réseaux.
 
 Les tailles d'entrée et les caractéristiques diffèrent selon les méthodes : on
@@ -58,15 +69,16 @@ et peut être remplacé par `--data-dir`.
 ## Relancer la comparaison complète
 
 ```powershell
-python -m wikiart.run_experiments --run-name comparaison_v1 --epochs 50 --threads 1
+python -m wikiart.run_experiments --run-name comparaison_v2 --epochs 50 --threads 1
 ```
 
 Cette commande lance MLP, CNN, ResNet18 et régression logistique, puis génère leurs
 diagnostics et le tableau comparatif. Par défaut, **l'entraînement et les mesures
 d'inférence sont réalisés sur CPU**, avec un thread, pour documenter le coût CPU.
 ResNet18 peut télécharger ses poids ImageNet lors de la première exécution.
-Chaque réseau utilise Adam ; les taux d'apprentissage sont fixés à 0.001 pour
-MLP/CNN et 0.0001 pour la couche finale de ResNet18 (dix fois moins pour son dernier bloc).
+Le MLP utilise AdamW, avec dropout 0.5 et weight decay 0 ; les autres réseaux
+gardent Adam. Les taux d'apprentissage sont 0.001 pour MLP/CNN et 0.0001 pour
+la couche finale de ResNet18 (dix fois moins pour son dernier bloc).
 
 On peut sélectionner des modèles avec `--models mlp classical`, changer la graine
 avec `--seed 1`, ou entraîner les réseaux sur GPU avec `--device cuda` ; les temps
@@ -77,12 +89,31 @@ Un nom de run ne doit pas réutiliser un dossier de modèle existant : choisir u
 nouveau `--run-name` pour une nouvelle expérience. Les anciens résultats de Malek
 dans `reports/baseline_softmax/` et `reports/resnet18/` restent conservés.
 
-Pour une expérience MLP seule, les étapes sont également accessibles séparément :
+Pour étudier le MLP sans consulter le test, on peut lancer plusieurs réglages :
 
 ```powershell
-python -m wikiart.train --model mlp --image-size 32 --epochs 50 --optimizer adam --learning-rate 0.001 --device cpu --threads 1 --checkpoint checkpoints/mlp/best_model.pt --history outputs/mlp/history.json
-python -m wikiart.evaluate --checkpoint checkpoints/mlp/best_model.pt --history outputs/mlp/history.json --output-dir reports/mlp --threads 1
-python -m wikiart.analyze --report-dir reports/mlp --history outputs/mlp/history.json
+python -m wikiart.train_mlp --image-size 64 --dropout 0.0
+python -m wikiart.train_mlp --image-size 64 --dropout 0.5
+python -m wikiart.train_mlp --image-size 128 --dropout 0.0
+```
+
+`--hidden1`, `--hidden2` et `--weight-decay` permettent les autres variations.
+Chaque réglage dispose de son dossier sous `reports/mlp/runs/`, avec historique
+JSON, résumé et courbes annotées. Le checkpoint et `run.json` sont aussi conservés.
+Le script refuse les chemins de sortie déjà existants.
+
+Pour mesurer seulement le nouveau MLP choisi, sans réentraîner CNN/ResNet18/classique :
+
+```powershell
+python -m wikiart.run_experiments --run-name comparaison_mlp_viv --models mlp --epochs 50 --threads 1
+```
+
+Le lanceur active alors explicitement `--test` pour générer métriques, erreurs
+et mesures CPU. Après cette exécution, la comparaison avec les trois autres
+modèles conservés est possible si les contrôles de compatibilité passent :
+
+```powershell
+python -m wikiart.compare --report-dirs reports/mlp/runs/comparaison_mlp_viv reports/comparaison_v1/cnn reports/comparaison_v1/resnet18 reports/comparaison_v1/classical --output-dir reports/comparaison_mlp_viv
 ```
 
 Pour entraîner seulement la référence classique :
@@ -94,7 +125,10 @@ python -m wikiart.analyze --report-dir reports/classical
 
 ## Résultats et interprétation
 
-Pour un run `comparaison_v1`, les fichiers suivants sont générés :
+Les chemins ci-dessous illustrent les sorties des trois autres modèles dans
+`comparaison_v1`. Le MLP historique a été déplacé dans
+`reports/mlp/archives/luna_32px/` ; ses nouveaux runs utilisent
+`reports/mlp/runs/<nom_du_run>/`, avec les mêmes noms de fichiers communs :
 
 | Emplacement | Contenu |
 |---|---|
@@ -132,8 +166,11 @@ et, pour la méthode classique, tous les candidats `C`.
 Les résultats historiques enregistrés sont **57.3 %** pour l'expérience
 `baseline_softmax` et **80.0 %** pour ResNet18 sur 225 images de test.
 Ils ne comportent pas le protocole CPU et les métadonnées du nouveau comparateur.
-**Aucun résultat du nouveau MLP ou de la comparaison complète n'est annoncé avant
-leur exécution.** Le comparateur refuse de mélanger les anciens rapports avec les nouveaux.
+La comparaison initiale `comparaison_v1` donne 35.6 % pour le MLP 32 px,
+60.9 % pour le CNN, 80.9 % pour ResNet18 et 41.8 % pour la référence classique.
+Ces fichiers restent inchangés. Le nouveau MLP de Viviam intégré n'a pas encore
+été évalué sur WikiArt sous le protocole commun ; aucun score n'est inventé.
+Le comparateur refuse les rapports dépourvus des métadonnées nécessaires.
 
 ## Vérification et Git
 

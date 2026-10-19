@@ -15,8 +15,11 @@
 /FINAL PROJECT_.docx
 /make_wikiart_subset.py
 /Slide today.pdf
+/EXPLICATION_PROJET.md
 
 # Python and notebook cache files
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
+
+

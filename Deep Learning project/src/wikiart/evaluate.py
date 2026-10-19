@@ -9,11 +9,11 @@ from PIL import Image
 import torch
 
 from .data import DEFAULT_DATA_DIR, create_dataloaders, dataset_signature
-from .model import build_model
+from .model import build_model, load_model_state
 from .reporting import benchmark_cpu, write_evaluation, write_json
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR))
     parser.add_argument("--checkpoint", default="checkpoints/best_model.pt")
@@ -23,7 +23,7 @@ def main():
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--benchmark-repeats", type=int, default=50)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.threads < 1 or args.batch_size < 1 or args.benchmark_repeats < 1:
         parser.error("Threads, batch size and benchmark repeats must be positive")
     torch.set_num_threads(args.threads)
@@ -48,8 +48,9 @@ def main():
         dropout=checkpoint.get("dropout", 0.3), width=checkpoint.get("width", 1),
         pretrained=False, image_size=checkpoint["image_size"],
         hidden_dim=checkpoint.get("hidden_dim", 256),
+        hidden1=checkpoint.get("hidden1"), hidden2=checkpoint.get("hidden2"),
     ).eval()
-    model.load_state_dict(checkpoint["model_state_dict"])
+    load_model_state(model, checkpoint["model_state_dict"])
     probabilities, labels = [], []
     with torch.inference_mode():
         for images, targets in test_loader:
@@ -75,6 +76,9 @@ def main():
             "image_size": checkpoint["image_size"],
             "normalization": checkpoint.get("normalization", "half"),
             "best_epoch": checkpoint.get("best_epoch"), "training": run,
+            "hidden1": checkpoint.get("hidden1"), "hidden2": checkpoint.get("hidden2"),
+            "dropout": checkpoint.get("dropout", 0.3),
+            "mlp_implementation": checkpoint.get("mlp_implementation"),
         },
     )
     validation = val_loader.dataset
@@ -102,6 +106,7 @@ def main():
     print(f"{architecture}: test accuracy {metrics['test_accuracy']:.3f}")
     print(f"CPU end-to-end median: {timings['end_to_end']['median_ms']:.3f} ms")
     print(f"Saved under {Path(args.output_dir).resolve()}")
+    return metrics
 
 
 if __name__ == "__main__":

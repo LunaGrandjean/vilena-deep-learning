@@ -1,5 +1,11 @@
 # Comparaison des modèles
 
+Comparaison historique : la ligne MLP correspond à l'ancien modèle de Luna
+à 32 pixels. Ses rapports sont conservés dans
+[l'archive MLP 32 px](../mlp/archives/luna_32px/test_metrics.json).
+Le MLP actif est celui de Viviam ; ses futurs résultats sont regroupés dans
+`reports/mlp/runs/` et ne sont pas encore représentés dans ce tableau.
+
 Même jeu d'images, même séparation stratifiée, même graine et même protocole CPU.
 
 | Modèle | Accuracy test | F1 macro | CPU modèle (ms) | CPU total médian (ms) | CPU total p95 (ms) | Entraînement (s) | Taille (Mo) |

@@ -80,6 +80,10 @@ def fit(
     hidden_dim=256,
     normalization_stats=None,
     data_signature=None,
+    hidden1=None,
+    hidden2=None,
+    dropout=0.3,
+    weight_decay=0.0,
 ):
     loss_fn = nn.CrossEntropyLoss()
     if architecture == "resnet18":
@@ -90,9 +94,11 @@ def fit(
     else:
         optimizer_parameters = model.parameters()
     if optimizer_name == "sgd":
-        optimizer = torch.optim.SGD(optimizer_parameters, lr=learning_rate)
+        optimizer = torch.optim.SGD(optimizer_parameters, lr=learning_rate, weight_decay=weight_decay)
+    elif optimizer_name == "adamw":
+        optimizer = torch.optim.AdamW(optimizer_parameters, lr=learning_rate, weight_decay=weight_decay)
     else:
-        optimizer = torch.optim.Adam(optimizer_parameters, lr=learning_rate)
+        optimizer = torch.optim.Adam(optimizer_parameters, lr=learning_rate, weight_decay=weight_decay)
 
     history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
     checkpoint_path = Path(checkpoint_path)
@@ -120,11 +126,15 @@ def fit(
                     "width": width,
                     "pretrained": pretrained,
                     "hidden_dim": hidden_dim,
+                    "hidden1": hidden1,
+                    "hidden2": hidden2,
+                    "mlp_implementation": "viviam_v1" if architecture == "mlp" else None,
                     "normalization_stats": normalization_stats,
                     "dataset_signature": data_signature,
                     "image_size": image_size,
                     "normalization": normalization,
-                    "dropout": 0.3,
+                    "dropout": dropout,
+                    "weight_decay": weight_decay,
                     "seed": seed,
                     "best_val_loss": best_val_loss,
                     "best_val_acc": val_acc,
@@ -143,7 +153,7 @@ def fit(
     return history
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR))
     parser.add_argument("--checkpoint", default="checkpoints/best_model.pt")
@@ -153,22 +163,31 @@ def main():
     parser.add_argument("--image-size", type=int, default=128)
     parser.add_argument("--model", choices=("mlp", "cnn", "resnet18"), default="cnn")
     parser.add_argument("--hidden-dim", type=int, default=256)
+    parser.add_argument("--hidden1", type=int, help="MLP first hidden layer; overrides --hidden-dim")
+    parser.add_argument("--hidden2", type=int, help="MLP second hidden layer; defaults to hidden1 // 2")
+    parser.add_argument("--dropout", type=float, default=0.3)
+    parser.add_argument("--weight-decay", type=float, default=0.0)
     parser.add_argument("--width", type=int, choices=(1, 2), default=1)
     parser.add_argument("--learning-rate", type=float, default=0.01)
-    parser.add_argument("--optimizer", choices=("sgd", "adam"), default="sgd")
+    parser.add_argument("--optimizer", choices=("sgd", "adam", "adamw"), default="sgd")
     parser.add_argument(
         "--normalization", choices=("train", "half", "imagenet"), default="train"
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--threads", type=int, default=1)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    args.hidden1 = args.hidden_dim if args.hidden1 is None else args.hidden1
+    args.hidden2 = args.hidden1 // 2 if args.hidden2 is None else args.hidden2
     if args.epochs < 1:
         parser.error("--epochs must be at least 1")
     if args.learning_rate <= 0:
         parser.error("--learning-rate must be positive")
-    if args.batch_size < 1 or args.image_size < 1 or args.hidden_dim < 2 or args.threads < 1:
+    if (args.batch_size < 1 or args.image_size < 1 or args.hidden1 < 1
+            or args.hidden2 < 1 or args.threads < 1):
         parser.error("Invalid batch size, image size, hidden dimension or thread count")
+    if not 0 <= args.dropout < 1 or args.weight_decay < 0:
+        parser.error("Dropout must be in [0, 1) and weight decay must be nonnegative")
     if args.model == "resnet18" and args.normalization != "imagenet":
         parser.error("Pretrained ResNet18 requires --normalization imagenet")
 
@@ -193,6 +212,9 @@ def main():
         pretrained=pretrained,
         image_size=args.image_size,
         hidden_dim=args.hidden_dim,
+        hidden1=args.hidden1,
+        hidden2=args.hidden2,
+        dropout=args.dropout,
     ).to(device)
     normalizer = train_loader.dataset.dataset.transform.transforms[-1]
     normalization_stats = {"mean": list(normalizer.mean), "std": list(normalizer.std)}
@@ -226,6 +248,10 @@ def main():
         hidden_dim=args.hidden_dim,
         normalization_stats=normalization_stats,
         data_signature=data_signature,
+        hidden1=args.hidden1,
+        hidden2=args.hidden2,
+        dropout=args.dropout,
+        weight_decay=args.weight_decay,
     )
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -245,6 +271,7 @@ def main():
     })
     print(f"best checkpoint: {Path(args.checkpoint).resolve()}")
     print(f"training history: {history_path.resolve()}")
+    return history
 
 
 if __name__ == "__main__":
