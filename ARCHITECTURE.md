@@ -72,12 +72,13 @@ source metadata, so it cannot be treated as one actual painter for grouping.
 ## Repository layout
 
 ```text
-Deep Learning project/
+final-project/
 ├── .gitignore                 # excludes local data and training artifacts
 ├── ARCHITECTURE.md             # model and workflow plan
 ├── README.md
 ├── requirements.txt
 ├── pyproject.toml              # install the src/ package in editable mode
+├── graphs-slides/              # presentation plots in burgundy and olive
 ├── data/                       # local, ignored
 │   └── wikiart_style5/         # 5 classes × 300 images, metadata, subset info
 ├── notebooks/                  # exploration and course experiments
