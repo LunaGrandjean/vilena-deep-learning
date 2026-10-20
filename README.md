@@ -7,6 +7,8 @@ classification, coût sur CPU et complexité du modèle.
 
 La structure des modèles est décrite dans [ARCHITECTURE.md](ARCHITECTURE.md).
 Les résultats, figures et diagnostics sont disponibles dans `reports/`.
+Les six graphiques aux couleurs du diaporama sont regroupés dans
+[`graphs-slides/`](graphs-slides/README.md).
 
 Le MLP actif reprend désormais le travail de Viviam : deux couches configurables,
 AdamW, dropout et weight decay, résumés de validation et courbes annotées.
@@ -24,7 +26,7 @@ son ancien partage 1 049/226/225, et ne remplace pas le nouveau run commun.
 
 ## Données et protocole
 
-Les données locales sont dans **`Deep Learning project/data/wikiart_style5/`** :
+Les données locales sont dans **`data/wikiart_style5/`**, depuis `final-project` :
 **1 500 JPEG RGB de 128 × 128 pixels, avec 300 images par style**, accompagnés de
 `metadata.csv` et `subset_info.json`. Ce dernier conserve la révision WikiArt, la
 graine et les paramètres de sélection. Les images ne sont pas versionnées.
@@ -64,12 +66,11 @@ sans prétendre isoler le seul effet de l'architecture.
 Depuis **`final-project`**, avec son environnement `.venv` activé :
 
 ```powershell
-cd "Deep Learning project"
 python -m pip install -r requirements.txt
 python -m pip install -e .
 ```
 
-Les commandes Python ci-dessous se lancent depuis **`Deep Learning project`**.
+Les commandes Python et Git ci-dessous se lancent depuis **`final-project`**.
 Le chemin des données par défaut est résolu à partir de l'emplacement du package,
 et peut être remplacé par `--data-dir`.
 
@@ -198,12 +199,11 @@ pas le projet sur WikiArt :
 python -m unittest discover -s tests -v
 ```
 
-Pour les commits et les push, revenir dans **`final-project`** :
+Pour les commits et les push, rester dans **`final-project`** :
 
 ```powershell
-cd ..
 git status
-git add "Deep Learning project"
+git add -A
 git commit -m "Add MLP, learning diagnostics and CPU comparison"
 git push -u origin luna
 ```
