@@ -1,0 +1,101 @@
+{
+  "test_loss": 1.4672629931707788,
+  "test_accuracy": 0.38222222222222224,
+  "classification_report": {
+    "Baroque": {
+      "precision": 0.48936170212765956,
+      "recall": 0.5111111111111111,
+      "f1-score": 0.5,
+      "support": 45.0
+    },
+    "Cubism": {
+      "precision": 0.13793103448275862,
+      "recall": 0.08888888888888889,
+      "f1-score": 0.10810810810810811,
+      "support": 45.0
+    },
+    "Impressionism": {
+      "precision": 0.3870967741935484,
+      "recall": 0.26666666666666666,
+      "f1-score": 0.3157894736842105,
+      "support": 45.0
+    },
+    "Pop_Art": {
+      "precision": 0.4358974358974359,
+      "recall": 0.37777777777777777,
+      "f1-score": 0.40476190476190477,
+      "support": 45.0
+    },
+    "Ukiyo_e": {
+      "precision": 0.379746835443038,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.4838709677419355,
+      "support": 45.0
+    },
+    "accuracy": 0.38222222222222224,
+    "macro avg": {
+      "precision": 0.36600675642888814,
+      "recall": 0.3822222222222222,
+      "f1-score": 0.3625060908592318,
+      "support": 225.0
+    },
+    "weighted avg": {
+      "precision": 0.3660067564288881,
+      "recall": 0.38222222222222224,
+      "f1-score": 0.36250609085923174,
+      "support": 225.0
+    }
+  },
+  "metadata": {
+    "model": "mlp",
+    "seed": 0,
+    "dataset_signature": "07dd1bd2f78cc0b633b74ac2149d9e3d00b82da3d2003e3807fea8ca203b56b6",
+    "image_size": 64,
+    "normalization": "half",
+    "best_epoch": 27,
+    "training": {
+      "data_dir": "C:\\Users\\lgrandjean\\OneDrive - Université Paris Sciences et Lettres\\AS_Y5\\Y5_S9\\Y5_S9_DEEP-LEARNING\\final-project\\data\\wikiart_style5",
+      "checkpoint": "C:\\Users\\lgrandjean\\OneDrive - Université Paris Sciences et Lettres\\AS_Y5\\Y5_S9\\Y5_S9_DEEP-LEARNING\\final-project\\checkpoints\\mlp_runs\\64px_h256-128_dropout0.5_wd0.0\\best_model.pt",
+      "history": "C:\\Users\\lgrandjean\\OneDrive - Université Paris Sciences et Lettres\\AS_Y5\\Y5_S9\\Y5_S9_DEEP-LEARNING\\final-project\\outputs\\mlp_runs\\64px_h256-128_dropout0.5_wd0.0\\history.json",
+      "epochs": 50,
+      "batch_size": 32,
+      "image_size": 64,
+      "model": "mlp",
+      "hidden_dim": 256,
+      "hidden1": 256,
+      "hidden2": 128,
+      "dropout": 0.5,
+      "weight_decay": 0.0,
+      "width": 1,
+      "learning_rate": 0.001,
+      "optimizer": "adamw",
+      "normalization": "half",
+      "seed": 0,
+      "device": "cpu",
+      "threads": 1,
+      "torch": "2.14.1+cpu",
+      "preparation_seconds": 0.4486126000410877,
+      "training_seconds": 55.818479000008665,
+      "training_timing_scope": "All epochs, validation and checkpoint writes; excludes preparation",
+      "dataset_signature": "07dd1bd2f78cc0b633b74ac2149d9e3d00b82da3d2003e3807fea8ca203b56b6",
+      "split_counts": {
+        "train": 1050,
+        "validation": 225,
+        "test": 225
+      }
+    },
+    "hidden1": 256,
+    "hidden2": 128,
+    "dropout": 0.5,
+    "mlp_implementation": "viviam_v1",
+    "classes": [
+      "Baroque",
+      "Cubism",
+      "Impressionism",
+      "Pop_Art",
+      "Ukiyo_e"
+    ],
+    "test_count": 225,
+    "test_signature": "0b1dc18ea16b85b3c57fc3eddd01ebe7d6839e42bce47f0d633cdd6e460341db"
+  }
+}
