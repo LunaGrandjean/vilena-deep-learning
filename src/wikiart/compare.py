@@ -75,7 +75,8 @@ def compare_reports(report_dirs, output_dir):
                   "Le processus et les caches sont chauds, le chargement initial des poids est exclu. "
                   "Les tailles mesurent les fichiers sérialisés, pas le pic de RAM.", "",
                   "Les temps d'entraînement couvrent toutes les époques (et leurs validations) pour "
-                  "les réseaux, et tous les candidats C pour la régression logistique. La préparation "
+                  "les réseaux (extraction initiale des représentations comprise pour VGG16 gelé), "
+                  "et tous les candidats C pour la régression logistique. La préparation "
                   "des données/caractéristiques est séparée dans le CSV. Les architectures utilisent "
                   "des prétraitements adaptés (tailles et normalisation enregistrées dans leurs métadonnées) ; les écarts "
                   "reflètent donc les pipelines complets, pas seulement les architectures.", "",

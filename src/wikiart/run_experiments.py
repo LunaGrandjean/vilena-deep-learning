@@ -12,7 +12,7 @@ from .data import DEFAULT_DATA_DIR, PROJECT_DIR
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR))
-    parser.add_argument("--models", nargs="+", choices=("mlp", "cnn", "resnet18", "classical"),
+    parser.add_argument("--models", nargs="+", choices=("mlp", "cnn", "resnet18", "vgg16", "classical"),
                         default=["mlp", "cnn", "resnet18", "classical"])
     parser.add_argument("--run-name", default="experiments",
                         help="A new directory name under reports/, outputs/ and checkpoints/")
@@ -74,6 +74,7 @@ def main():
         settings = {
             "cnn": (128, "train", 0.001),
             "resnet18": (224, "imagenet", 0.0001),
+            "vgg16": (224, "imagenet", 0.0001),
         }
         size, normalization, rate = settings[model]
         history = Path("outputs") / args.run_name / model / "history.json"

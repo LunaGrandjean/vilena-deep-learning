@@ -1,7 +1,8 @@
-"""Dense MLP, compact CNN and pretrained ResNet18 for WikiArt styles."""
+"""Dense, convolutional and ImageNet transfer models for WikiArt styles."""
 
+import torch
 import torch.nn as nn
-from torchvision.models import ResNet18_Weights, resnet18
+from torchvision.models import ResNet18_Weights, VGG16_Weights, resnet18, vgg16
 
 
 def _conv_block(in_channels: int, out_channels: int) -> nn.Sequential:
@@ -48,6 +49,47 @@ def load_model_state(model, state):
         state = {f"{names[key.rsplit('.', 1)[0]]}.{key.rsplit('.', 1)[1]}": value
                  for key, value in state.items()}
     model.load_state_dict(state)
+
+
+class FrozenVGG16(nn.Module):
+    """Standard VGG16 with only its replacement final linear layer trained.
+
+    Frozen ImageNet layers, including the two 4096-unit layers, remain in eval
+    mode during training. Their dropout is disabled so representations can be
+    cached exactly; evaluation and CPU timing still execute the entire network.
+    """
+
+    def __init__(self, num_classes, pretrained=False):
+        super().__init__()
+        weights = VGG16_Weights.IMAGENET1K_V1 if pretrained else None
+        base = vgg16(weights=weights, init_weights=False)
+        base.requires_grad_(False)
+        base.classifier[-1] = nn.Linear(base.classifier[-1].in_features, num_classes)
+        self.features = base.features
+        self.avgpool = base.avgpool
+        self.classifier = base.classifier
+        self.train()
+
+    @property
+    def head(self):
+        return self.classifier[-1]
+
+    def train(self, mode=True):
+        super().train(mode)
+        self.features.eval()
+        self.avgpool.eval()
+        for layer in list(self.classifier)[:-1]:
+            layer.eval()
+        return self
+
+    def forward_features(self, images):
+        features = torch.flatten(self.avgpool(self.features(images)), 1)
+        for layer in list(self.classifier)[:-1]:
+            features = layer(features)
+        return features
+
+    def forward(self, images):
+        return self.head(self.forward_features(images))
 
 
 class WikiArtCNN(nn.Module):
@@ -121,4 +163,6 @@ def build_model(
             for name, parameter in model.named_parameters():
                 parameter.requires_grad = name.startswith(("layer4.", "fc."))
         return model
+    if architecture == "vgg16":
+        return FrozenVGG16(num_classes, pretrained=pretrained)
     raise ValueError(f"Unknown architecture: {architecture}")

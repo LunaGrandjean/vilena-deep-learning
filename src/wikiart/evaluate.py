@@ -79,6 +79,7 @@ def main(argv=None):
             "hidden1": checkpoint.get("hidden1"), "hidden2": checkpoint.get("hidden2"),
             "dropout": checkpoint.get("dropout", 0.3),
             "mlp_implementation": checkpoint.get("mlp_implementation"),
+            "transfer_mode": checkpoint.get("transfer_mode"),
         },
     )
     validation = val_loader.dataset

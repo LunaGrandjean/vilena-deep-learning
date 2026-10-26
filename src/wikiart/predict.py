@@ -25,7 +25,7 @@ def load_model(checkpoint_path):
 def preprocess(image_path, checkpoint):
     """Turn any photo into the same kind of tensor the model saw during evaluation."""
     if checkpoint["normalization"] != "imagenet":
-        raise ValueError("This demo expects the ResNet18 checkpoint (ImageNet normalisation)")
+        raise ValueError("This demo expects an ImageNet-normalized checkpoint (ResNet18 or VGG16)")
     size = checkpoint["image_size"]                                   # 224 for ResNet18
     image = Image.open(image_path).convert("RGB")
     image = transforms.CenterCrop(min(image.size))(image)             # 1. square, like the dataset
@@ -42,7 +42,7 @@ def preprocess(image_path, checkpoint):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", help="Path to a painting image (jpg, png...)")
-    parser.add_argument("--checkpoint", required=True, help="Path to the trained ResNet18 .pt file")
+    parser.add_argument("--checkpoint", required=True, help="Path to the trained ResNet18 or VGG16 .pt file")
     parser.add_argument("--top", type=int, default=3, help="How many styles to show")
     args = parser.parse_args()
 
