@@ -75,6 +75,60 @@ Les commandes Python et Git ci-dessous se lancent depuis **`final-project`**.
 Le chemin des données par défaut est résolu à partir de l'emplacement du package,
 et peut être remplacé par `--data-dir`.
 
+## Application de démonstration locale
+
+Une interface web reprend la démo photo → style de Viviam, avec ResNet18 par
+défaut. Six variantes sont disponibles : ResNet18, VGG16, petit CNN, MLP avec
+dropout 0,5, MLP sans dropout et régression logistique. Depuis `final-project`,
+avec `.venv` activé :
+
+```powershell
+python -m pip install -r requirements.txt
+python -m wikiart.app
+```
+
+Ouvrir **http://127.0.0.1:8501**. Importer une photo (JPG, PNG ou WebP, jusqu'à
+10 Mo), sélectionner un modèle puis cliquer sur **Explore this painting**.
+Les cinq probabilités sont affichées, avec le style prédit. Cinq exemples du
+jeu de test sont également proposés si les données locales sont présentes.
+Ils sont choisis sans filtrer selon la justesse de la prédiction ; leur style
+réel est affiché pour pouvoir discuter les erreurs.
+
+Le bouton **Compare all models** lance les modèles disponibles sur la même
+image et affiche leurs styles prédits, probabilités principales et temps
+d'analyse. Cliquer sur une ligne donne les cinq probabilités de ce modèle ;
+**Back to all models** revient au tableau sans relancer les calculs. Les
+probabilités ne sont pas calibrées entre modèles : un pourcentage plus élevé
+ne signifie pas une meilleure précision. Les temps d'une seule image ne sont
+pas un benchmark et excluent le chargement initial des checkpoints.
+
+Les modèles sont chargés à la première utilisation puis réutilisés. L'app
+fonctionne sur CPU, avec un thread, et réutilise `wikiart.predict` pour le
+prétraitement et le chargement des checkpoints. L'orientation EXIF des photos
+est corrigée, puis le centre carré est préparé selon le protocole existant.
+Chaque réseau utilise la taille et la normalisation de son checkpoint, y
+compris les statistiques train du CNN. La méthode classique utilise ses 864
+caractéristiques RGB et son pipeline de standardisation/régression enregistré.
+Le temps affiché couvre prétraitement et prédiction, sans le premier chargement
+des poids ; il ne remplace pas le benchmark des rapports.
+
+Checkpoints locaux attendus (ignorés par Git) :
+
+- `checkpoints/comparaison_v1/resnet18/best_model.pt`
+- `checkpoints/comparaison_vgg16/vgg16/best_model.pt`
+- `checkpoints/comparaison_v1/cnn/best_model.pt`
+- `checkpoints/mlp_runs/64px_h256-128_dropout0.5_wd0.0/best_model.pt`
+- `checkpoints/mlp_runs/64px_h256-128_dropout0.0_wd0.0/best_model.pt`
+- `checkpoints/comparaison_v1/classical/model.joblib`
+
+Un modèle absent est désactivé ; la comparaison utilise les modèles disponibles
+et signale ceux qu'elle n'a pas pu exécuter. Les images importées restent en mémoire,
+ne sont pas enregistrées et ne sont pas envoyées à un service externe. La
+démo choisit toujours parmi les cinq styles connus ; ses probabilités ne sont
+pas calibrées et ne constituent pas une certitude. Pour changer le port :
+`python -m wikiart.app --port 8502`. Arrêter le serveur avec `Ctrl+C` dans le
+terminal qui l'a lancé. Aucun entraînement n'est déclenché par l'application.
+
 ## Relancer la comparaison complète
 
 ```powershell
