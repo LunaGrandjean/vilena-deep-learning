@@ -16,7 +16,7 @@ from PIL import Image
 from .data import DEFAULT_DATA_DIR
 
 
-def learning_diagnostics(history, output_dir):
+def learning_diagnostics(history, output_dir, *, frozen_features=False):
     keys = ("train_loss", "val_loss", "train_acc", "val_acc")
     arrays = {key: np.asarray(history[key], dtype=float) for key in keys}
     lengths = {len(values) for values in arrays.values()}
@@ -27,8 +27,11 @@ def learning_diagnostics(history, output_dir):
     best = int(np.argmin(arrays["val_loss"]))
     fig, axes = plt.subplots(1, 2, figsize=(11, 4))
     for ax, suffix, label in zip(axes, ("loss", "acc"), ("Cross-entropy loss", "Accuracy")):
-        ax.plot(epochs, arrays[f"train_{suffix}"], label="Train (augmentation + dropout)")
-        ax.plot(epochs, arrays[f"val_{suffix}"], label="Validation")
+        ax.plot(epochs, arrays[f"train_{suffix}"],
+                label="Train (random horizontal flip)" if frozen_features else "Train (augmentation + dropout)",
+                color="#7B3035" if frozen_features else None)
+        ax.plot(epochs, arrays[f"val_{suffix}"], label="Validation",
+                color="#7C874C" if frozen_features else None)
         ax.axvline(best + 1, color="gray", linestyle="--", label="Selected checkpoint")
         ax.set(xlabel="Epoch", ylabel=label)
         ax.legend(fontsize=8)
@@ -57,8 +60,12 @@ def learning_diagnostics(history, output_dir):
                      "Cela ne prouve pas l'absence de surapprentissage.")
     if best == len(epochs) - 1:
         lines.append("- Le meilleur point est la dernière époque : la convergence reste à examiner.")
-    lines.append("Les mesures train utilisent augmentation/dropout, celles de validation les "
-                 "désactivent : leur écart ne mesure pas à lui seul le surapprentissage.")
+    lines.append(
+        "Les mesures train utilisent le retournement horizontal aléatoire, sans dropout ; "
+        "la validation n'est pas augmentée. L'écart ne mesure pas à lui seul le surapprentissage."
+        if frozen_features else
+        "Les mesures train utilisent augmentation/dropout, celles de validation les "
+        "désactivent : leur écart ne mesure pas à lui seul le surapprentissage.")
     return lines
 
 
@@ -80,7 +87,16 @@ def analyze_run(report_dir, data_dir=DEFAULT_DATA_DIR, history_path=None):
         if training != run:
             raise ValueError("History metadata does not match the evaluated training run")
         history = json.loads(history_path.read_text(encoding="utf-8"))
-        lines.extend(learning_diagnostics(history, report_dir))
+        lines.extend(learning_diagnostics(
+            history, report_dir, frozen_features=run.get("transfer_mode") == "frozen_features_linear_head"))
+        if run.get("transfer_mode") == "frozen_features_linear_head":
+            lines.extend([
+                "- VGG16 : couches ImageNet gelées, seule la sortie linéaire est apprise ; "
+                "dropout préentraîné désactivé, retournement horizontal aléatoire sur train uniquement.",
+                f"- Paramètres entraînés : {run['trainable_parameters']:,} ; extraction initiale "
+                f"des représentations : {run['feature_extraction_seconds']:.2f} s, comprise dans "
+                "le temps d'entraînement. Le benchmark CPU exécute le réseau complet sans cache.",
+            ])
     else:
         lines.append("Pas d'historique fourni : aucun constat sur les courbes d'apprentissage.")
     wrong = sorted((row for row in rows if row["true_style"] != row["predicted_style"]),

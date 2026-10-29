@@ -22,6 +22,7 @@ from wikiart import analyze, classical, evaluate, run_experiments, train, train_
 from wikiart.compare import compare_reports
 from wikiart.compare_mlp import describe, load_runs
 from wikiart.data import dataset_signature, split_indices
+from wikiart.frozen_features import cache_feature_loaders
 from wikiart.model import build_model, load_model_state
 
 
@@ -45,6 +46,80 @@ class WorkflowTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         torch.set_num_threads(1)
+
+    def test_vgg16_frozen_features_checkpoint_and_full_image_evaluation(self):
+        # A small stand-in exercises the same VGG wrapper and cache mechanics
+        # without downloading ImageNet weights or writing a 537 MB checkpoint.
+        def tiny_vgg(**kwargs):
+            base = torch.nn.Module()
+            base.features = torch.nn.Sequential(torch.nn.Conv2d(3, 4, 1), torch.nn.ReLU())
+            base.avgpool = torch.nn.AdaptiveAvgPool2d((1, 1))
+            base.classifier = torch.nn.Sequential(
+                torch.nn.Linear(4, 8), torch.nn.ReLU(), torch.nn.Dropout(0.5),
+                torch.nn.Linear(8, 7), torch.nn.ReLU(), torch.nn.Dropout(0.5),
+                torch.nn.Linear(7, 1000))
+            return base
+
+        with tempfile.TemporaryDirectory(prefix="wikiart-vgg-test-") as temp, \
+                patch("wikiart.model.vgg16", side_effect=tiny_vgg):
+            root = Path(temp)
+            data = root / "images"
+            make_images(data)
+            from wikiart.data import create_dataloaders
+            loaders = create_dataloaders(data, batch_size=8, image_size=224,
+                                         normalization="imagenet", augment=False)
+            model = build_model("vgg16", 5, pretrained=True)
+            model.train()
+            self.assertFalse(any(layer.training for layer in model.modules()
+                                 if isinstance(layer, torch.nn.Dropout)))
+            self.assertEqual([name for name, p in model.named_parameters() if p.requires_grad],
+                             ["classifier.6.weight", "classifier.6.bias"])
+            with redirect_stdout(io.StringIO()):
+                cached_train, cached_val = cache_feature_loaders(model, *loaders[:2], "cpu")
+            images, _ = next(iter(torch.utils.data.DataLoader(loaders[0].dataset, batch_size=8)))
+            with torch.no_grad():
+                torch.testing.assert_close(cached_train.dataset.original[:8], model.forward_features(images))
+                torch.testing.assert_close(cached_train.dataset.flipped[:8], model.forward_features(images.flip(-1)))
+                torch.testing.assert_close(model.head(model.forward_features(images)), model(images))
+            self.assertEqual(len(cached_train.dataset), 70)
+            self.assertEqual(len(cached_val.dataset), 15)
+            checkpoint, history = root / "best.pt", root / "history.json"
+            created = []
+            def track_model(*args, **kwargs):
+                network = build_model(*args, **kwargs)
+                created.append((network, {name: p.detach().clone()
+                                         for name, p in network.named_parameters()}))
+                return network
+            with patch.object(train, "build_model", side_effect=track_model):
+                run_main(train, "--model", "vgg16", "--data-dir", data,
+                         "--image-size", 224, "--normalization", "imagenet", "--device", "cpu",
+                         "--epochs", 2, "--batch-size", 8, "--optimizer", "adam",
+                         "--learning-rate", 0.001, "--checkpoint", checkpoint, "--history", history)
+            saved = torch.load(checkpoint, weights_only=True)
+            restored = build_model("vgg16", 5).eval()
+            load_model_state(restored, saved["model_state_dict"])
+            self.assertEqual(saved["transfer_mode"], "frozen_features_linear_head")
+            trace = json.loads(history.read_text())
+            self.assertEqual(saved["best_epoch"], int(np.argmin(trace["val_loss"])) + 1)
+            val_loss, _ = train.evaluate(restored, loaders[1], torch.nn.CrossEntropyLoss(), "cpu")
+            self.assertAlmostEqual(val_loss, saved["best_val_loss"], places=5)
+            trained, before = created[0]
+            for name, parameter in trained.named_parameters():
+                if not parameter.requires_grad:
+                    torch.testing.assert_close(parameter, before[name], rtol=0, atol=0)
+            self.assertFalse(torch.equal(trained.head.weight, before["classifier.6.weight"]))
+            report = root / "report"
+            run_main(evaluate, "--data-dir", data, "--checkpoint", checkpoint,
+                     "--history", history, "--output-dir", report, "--benchmark-repeats", 3)
+            result = json.loads((report / "test_metrics.json").read_text())
+            self.assertEqual(result["metadata"]["model"], "vgg16")
+            self.assertEqual(result["metadata"]["test_count"], 15)
+            analyze.analyze_run(report, data, history)
+            self.assertIn("VGG16", (report / "diagnostic.md").read_text(encoding="utf-8"))
+            from wikiart.predict import load_model as load_demo_model
+            demo_model, _ = load_demo_model(checkpoint)
+            with torch.no_grad():
+                torch.testing.assert_close(demo_model(images), restored(images), rtol=0, atol=0)
 
     def test_mlp_study_refuses_mixed_historical_and_common_protocols(self):
         with tempfile.TemporaryDirectory(prefix="wikiart-study-test-") as temp:

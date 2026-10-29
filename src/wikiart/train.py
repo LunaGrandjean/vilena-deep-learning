@@ -12,6 +12,7 @@ import torch.nn as nn
 
 from .data import DEFAULT_DATA_DIR, create_dataloaders, dataset_signature
 from .model import build_model
+from .frozen_features import cache_feature_loaders
 from .reporting import write_json
 
 
@@ -84,6 +85,7 @@ def fit(
     hidden2=None,
     dropout=0.3,
     weight_decay=0.0,
+    cached_features=False,
 ):
     loss_fn = nn.CrossEntropyLoss()
     if architecture == "resnet18":
@@ -92,7 +94,7 @@ def fit(
             {"params": model.fc.parameters(), "lr": learning_rate},
         ]
     else:
-        optimizer_parameters = model.parameters()
+        optimizer_parameters = [p for p in model.parameters() if p.requires_grad]
     if optimizer_name == "sgd":
         optimizer = torch.optim.SGD(optimizer_parameters, lr=learning_rate, weight_decay=weight_decay)
     elif optimizer_name == "adamw":
@@ -104,12 +106,13 @@ def fit(
     checkpoint_path = Path(checkpoint_path)
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     best_val_loss = float("inf")
+    best_head = None
 
     for epoch in range(epochs):
         train_loss, train_acc = train_one_epoch(
-            model, train_loader, loss_fn, optimizer, device
+            model.head if cached_features else model, train_loader, loss_fn, optimizer, device
         )
-        val_loss, val_acc = evaluate(model, val_loader, loss_fn, device)
+        val_loss, val_acc = evaluate(model.head if cached_features else model, val_loader, loss_fn, device)
         history["train_loss"].append(train_loss)
         history["train_acc"].append(train_acc)
         history["val_loss"].append(val_loss)
@@ -117,39 +120,51 @@ def fit(
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "classes": classes,
-                    "num_classes": len(classes),
-                    "architecture": architecture,
-                    "width": width,
-                    "pretrained": pretrained,
-                    "hidden_dim": hidden_dim,
-                    "hidden1": hidden1,
-                    "hidden2": hidden2,
-                    "mlp_implementation": "viviam_v1" if architecture == "mlp" else None,
-                    "normalization_stats": normalization_stats,
-                    "dataset_signature": data_signature,
-                    "image_size": image_size,
-                    "normalization": normalization,
-                    "dropout": dropout,
-                    "weight_decay": weight_decay,
-                    "seed": seed,
-                    "best_val_loss": best_val_loss,
-                    "best_val_acc": val_acc,
-                    "best_epoch": epoch + 1,
-                    "optimizer": optimizer_name,
-                    "learning_rate": learning_rate,
-                },
-                checkpoint_path,
-            )
+            checkpoint = {
+                "model_state_dict": model.state_dict(),
+                "classes": classes,
+                "num_classes": len(classes),
+                "architecture": architecture,
+                "width": width,
+                "pretrained": pretrained,
+                "pretrained_weights": "VGG16_Weights.IMAGENET1K_V1" if architecture == "vgg16" else None,
+                "hidden_dim": hidden_dim,
+                "hidden1": hidden1,
+                "hidden2": hidden2,
+                "mlp_implementation": "viviam_v1" if architecture == "mlp" else None,
+                "normalization_stats": normalization_stats,
+                "dataset_signature": data_signature,
+                "image_size": image_size,
+                "normalization": normalization,
+                "dropout": dropout,
+                "weight_decay": weight_decay,
+                "seed": seed,
+                "best_val_loss": best_val_loss,
+                "best_val_acc": val_acc,
+                "best_epoch": epoch + 1,
+                "optimizer": optimizer_name,
+                "learning_rate": learning_rate,
+                "transfer_mode": "frozen_features_linear_head" if cached_features else None,
+            }
+            if cached_features:
+                # Retain just the changing head until training finishes. Avoid
+                # rewriting the same ~537 MB of frozen weights every epoch.
+                best_head = {key: value.detach().cpu().clone()
+                             for key, value in model.head.state_dict().items()}
+            else:
+                torch.save(checkpoint, checkpoint_path)
 
         print(
             f"epoch {epoch + 1:2d}/{epochs} | train loss {train_loss:.4f} "
             f"| train acc {train_acc:.3f} | val loss {val_loss:.4f} | val acc {val_acc:.3f}"
         )
 
+    if cached_features:
+        if best_head is None:
+            raise ValueError("VGG16 training produced no finite validation checkpoint")
+        model.head.load_state_dict(best_head)
+        checkpoint["model_state_dict"] = model.state_dict()
+        torch.save(checkpoint, checkpoint_path)
     return history
 
 
@@ -161,7 +176,7 @@ def main(argv=None):
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--image-size", type=int, default=128)
-    parser.add_argument("--model", choices=("mlp", "cnn", "resnet18"), default="cnn")
+    parser.add_argument("--model", choices=("mlp", "cnn", "resnet18", "vgg16"), default="cnn")
     parser.add_argument("--hidden-dim", type=int, default=256)
     parser.add_argument("--hidden1", type=int, help="MLP first hidden layer; overrides --hidden-dim")
     parser.add_argument("--hidden2", type=int, help="MLP second hidden layer; defaults to hidden1 // 2")
@@ -179,6 +194,9 @@ def main(argv=None):
     args = parser.parse_args(argv)
     args.hidden1 = args.hidden_dim if args.hidden1 is None else args.hidden1
     args.hidden2 = args.hidden1 // 2 if args.hidden2 is None else args.hidden2
+    if args.model == "vgg16":
+        # Pretrained dropout layers are frozen in eval mode; the new head is linear.
+        args.dropout = 0.0
     if args.epochs < 1:
         parser.error("--epochs must be at least 1")
     if args.learning_rate <= 0:
@@ -188,8 +206,10 @@ def main(argv=None):
         parser.error("Invalid batch size, image size, hidden dimension or thread count")
     if not 0 <= args.dropout < 1 or args.weight_decay < 0:
         parser.error("Dropout must be in [0, 1) and weight decay must be nonnegative")
-    if args.model == "resnet18" and args.normalization != "imagenet":
-        parser.error("Pretrained ResNet18 requires --normalization imagenet")
+    if args.model in ("resnet18", "vgg16") and args.normalization != "imagenet":
+        parser.error("Pretrained ImageNet models require --normalization imagenet")
+    if args.model == "vgg16" and args.image_size != 224:
+        parser.error("The VGG16 experiment requires --image-size 224")
 
     set_seed(args.seed)
     torch.set_num_threads(args.threads)
@@ -203,8 +223,9 @@ def main(argv=None):
         image_size=args.image_size,
         seed=args.seed,
         normalization=args.normalization,
+        augment=args.model != "vgg16",
     )
-    pretrained = args.model == "resnet18"
+    pretrained = args.model in ("resnet18", "vgg16")
     model = build_model(
         architecture=args.model,
         num_classes=len(classes),
@@ -229,6 +250,14 @@ def main(argv=None):
     if device.type == "cuda":
         torch.cuda.synchronize()
     training_start = perf_counter()
+    feature_extraction_seconds = 0.0
+    split_counts = {"train": len(train_loader.dataset),
+                    "validation": len(val_loader.dataset), "test": len(test_loader.dataset)}
+    if args.model == "vgg16":
+        train_loader, val_loader = cache_feature_loaders(model, train_loader, val_loader, device, args.seed)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        feature_extraction_seconds = perf_counter() - training_start
     history = fit(
         model,
         train_loader,
@@ -252,6 +281,7 @@ def main(argv=None):
         hidden2=args.hidden2,
         dropout=args.dropout,
         weight_decay=args.weight_decay,
+        cached_features=args.model == "vgg16",
     )
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -264,10 +294,13 @@ def main(argv=None):
         "device": str(device), "torch": torch.__version__,
         "preparation_seconds": preparation_seconds,
         "training_seconds": training_seconds,
-        "training_timing_scope": "All epochs, validation and checkpoint writes; excludes preparation",
+        "training_timing_scope": "Frozen feature extraction (when used), all epochs, validation and checkpoint writes; excludes preparation",
+        "feature_extraction_seconds": feature_extraction_seconds,
+        "transfer_mode": "frozen_features_linear_head" if args.model == "vgg16" else None,
+        "pretrained_weights": "VGG16_Weights.IMAGENET1K_V1" if args.model == "vgg16" else None,
+        "trainable_parameters": sum(p.numel() for p in model.parameters() if p.requires_grad),
         "dataset_signature": data_signature,
-        "split_counts": {"train": len(train_loader.dataset),
-                         "validation": len(val_loader.dataset), "test": len(test_loader.dataset)},
+        "split_counts": split_counts,
     })
     print(f"best checkpoint: {Path(args.checkpoint).resolve()}")
     print(f"training history: {history_path.resolve()}")

@@ -49,6 +49,7 @@ limite ; ces résultats ne mesurent pas la généralisation à des artistes inco
 | MLP de Viviam | RGB 64 × 64 → vecteur de 12 288 pixels | `Linear(12288,256) → ReLU → Dropout(0.5) → Linear(256,128) → ReLU → Dropout(0.5) → Linear(128,5)`, depuis zéro ; couches et régularisation configurables |
 | Petit CNN | RGB 128 × 128 | Trois blocs convolution/BatchNorm/ReLU/pooling, puis classification, depuis zéro |
 | ResNet18 | RGB 224 × 224, normalisation ImageNet | Poids ImageNet ; dernier bloc résiduel et couche finale réentraînés |
+| VGG16 | RGB 224 × 224, normalisation ImageNet | Poids ImageNet `IMAGENET1K_V1` ; toutes les couches préentraînées gelées, seule la dernière couche `Linear(4096,5)` est apprise |
 | Régression logistique | Pixels RGB 16 × 16 + histogrammes RGB de 32 cases par canal, soit 864 variables | Standardisation ajustée sur train uniquement ; `C` choisi sur validation parmi 0.01, 0.1, 1 et 10 |
 
 Les réseaux renvoient des logits, utilisés avec `CrossEntropyLoss` ; le softmax
@@ -73,6 +74,60 @@ python -m pip install -e .
 Les commandes Python et Git ci-dessous se lancent depuis **`final-project`**.
 Le chemin des données par défaut est résolu à partir de l'emplacement du package,
 et peut être remplacé par `--data-dir`.
+
+## Application de démonstration locale
+
+Une interface web reprend la démo photo → style de Viviam, avec ResNet18 par
+défaut. Six variantes sont disponibles : ResNet18, VGG16, petit CNN, MLP avec
+dropout 0,5, MLP sans dropout et régression logistique. Depuis `final-project`,
+avec `.venv` activé :
+
+```powershell
+python -m pip install -r requirements.txt
+python -m wikiart.app
+```
+
+Ouvrir **http://127.0.0.1:8501**. Importer une photo (JPG, PNG ou WebP, jusqu'à
+10 Mo), sélectionner un modèle puis cliquer sur **Explore this painting**.
+Les cinq probabilités sont affichées, avec le style prédit. Cinq exemples du
+jeu de test sont également proposés si les données locales sont présentes.
+Ils sont choisis sans filtrer selon la justesse de la prédiction ; leur style
+réel est affiché pour pouvoir discuter les erreurs.
+
+Le bouton **Compare all models** lance les modèles disponibles sur la même
+image et affiche leurs styles prédits, probabilités principales et temps
+d'analyse. Cliquer sur une ligne donne les cinq probabilités de ce modèle ;
+**Back to all models** revient au tableau sans relancer les calculs. Les
+probabilités ne sont pas calibrées entre modèles : un pourcentage plus élevé
+ne signifie pas une meilleure précision. Les temps d'une seule image ne sont
+pas un benchmark et excluent le chargement initial des checkpoints.
+
+Les modèles sont chargés à la première utilisation puis réutilisés. L'app
+fonctionne sur CPU, avec un thread, et réutilise `wikiart.predict` pour le
+prétraitement et le chargement des checkpoints. L'orientation EXIF des photos
+est corrigée, puis le centre carré est préparé selon le protocole existant.
+Chaque réseau utilise la taille et la normalisation de son checkpoint, y
+compris les statistiques train du CNN. La méthode classique utilise ses 864
+caractéristiques RGB et son pipeline de standardisation/régression enregistré.
+Le temps affiché couvre prétraitement et prédiction, sans le premier chargement
+des poids ; il ne remplace pas le benchmark des rapports.
+
+Checkpoints locaux attendus (ignorés par Git) :
+
+- `checkpoints/comparaison_v1/resnet18/best_model.pt`
+- `checkpoints/comparaison_vgg16/vgg16/best_model.pt`
+- `checkpoints/comparaison_v1/cnn/best_model.pt`
+- `checkpoints/mlp_runs/64px_h256-128_dropout0.5_wd0.0/best_model.pt`
+- `checkpoints/mlp_runs/64px_h256-128_dropout0.0_wd0.0/best_model.pt`
+- `checkpoints/comparaison_v1/classical/model.joblib`
+
+Un modèle absent est désactivé ; la comparaison utilise les modèles disponibles
+et signale ceux qu'elle n'a pas pu exécuter. Les images importées restent en mémoire,
+ne sont pas enregistrées et ne sont pas envoyées à un service externe. La
+démo choisit toujours parmi les cinq styles connus ; ses probabilités ne sont
+pas calibrées et ne constituent pas une certitude. Pour changer le port :
+`python -m wikiart.app --port 8502`. Arrêter le serveur avec `Ctrl+C` dans le
+terminal qui l'a lancé. Aucun entraînement n'est déclenché par l'application.
 
 ## Relancer la comparaison complète
 
@@ -142,6 +197,55 @@ python -m wikiart.analyze --report-dir reports/classical
 ```
 
 ## Résultats et interprétation
+
+### Expérience VGG16
+
+Depuis `final-project`, pour lancer VGG16 seul avec le même partage et le même
+benchmark CPU que les autres modèles :
+
+```powershell
+$env:TORCH_HOME = Join-Path (Get-Location).Path "outputs/torch"
+python -m wikiart.run_experiments --models vgg16 --run-name comparaison_vgg16 --epochs 50 --threads 1
+```
+
+Les poids officiels sont téléchargés au premier lancement (environ 528 Mio).
+VGG16 conserve ses 13 convolutions et ses deux couches préentraînées de
+4 096 neurones. Seule la nouvelle sortie de cinq classes est entraînée :
+il s'agit d'un **extracteur gelé avec classifieur linéaire**, tandis que
+ResNet18 réentraîne aussi son dernier bloc. Ce n'est pas un fine-tuning complet
+de VGG16 ; la comparaison porte sur ces stratégies de transfert distinctes.
+
+Pour accélérer l'apprentissage CPU, les représentations train/validation sont
+calculées une fois en mémoire, avec le dropout préentraîné désactivé. Chaque
+image train dispose de sa version originale et retournée horizontalement ;
+le choix reste aléatoire à chaque accès pendant les 50 époques. La validation
+n'est pas augmentée et le test n'est pas utilisé pour ce cache. Le temps
+d'entraînement inclut cette extraction initiale ; son coût est aussi détaillé
+dans `run.json`. Le checkpoint est choisi par minimum de perte de validation.
+
+L'évaluation, la démo et le benchmark **exécutent le VGG16 complet**, sans ce
+cache d'apprentissage. Les poids et historiques bruts restent ignorés par Git.
+Le coût disque du checkpoint complet et la latence par image sont mesurés,
+pas uniquement ceux de la petite couche finale.
+
+Pour générer une nouvelle comparaison sans écraser les rapports historiques :
+
+```powershell
+python -m wikiart.compare --report-dirs reports/mlp/runs/64px_h256-128_dropout0.5_wd0.0 reports/comparaison_v1/cnn reports/comparaison_v1/resnet18 reports/comparaison_v1/classical reports/comparaison_vgg16/vgg16 --output-dir reports/comparaison_vgg16
+```
+
+Pour tester le checkpoint sur une image avec la démo de Viviam :
+
+```powershell
+python -m wikiart.predict "chemin/peinture.jpg" --checkpoint checkpoints/comparaison_vgg16/vgg16/best_model.pt
+```
+
+Le [bilan VGG16](reports/comparaison_vgg16/README.md) décrit le protocole et ses
+limites ; la [comparaison à cinq modèles](reports/comparaison_vgg16/comparison.md)
+réunit les mesures après exécution.
+
+Références : [VGG16 Torchvision](https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.vgg16.html)
+et [transfert d'apprentissage PyTorch](https://docs.pytorch.org/tutorials/beginner/transfer_learning_tutorial.html).
 
 Les chemins ci-dessous illustrent les sorties des trois autres modèles dans
 `comparaison_v1`. Le MLP historique a été déplacé dans

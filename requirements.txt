@@ -7,3 +7,4 @@ Pillow
 datasets>=3.0
 joblib
 threadpoolctl
+Flask>=3.1,<4

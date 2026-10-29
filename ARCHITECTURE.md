@@ -22,6 +22,14 @@ The [README](README.md) describes the current commands and full comparison.
   dropout-0.5 model achieves 36.0% test accuracy on the older 1049/226/225 split.
 - ResNet18: ImageNet initialization, 224x224 input, fine-tuned last residual
   block and classifier; earlier weights and BatchNorm statistics remain fixed.
+- VGG16: ImageNet `IMAGENET1K_V1`, 224x224 input, frozen convolutional layers
+  and two frozen 4096-unit layers; only `Linear(4096, 5)` is trained. Pretrained
+  dropout remains disabled. `frozen_features.py` caches original/flipped train
+  representations and unaugmented validation representations in memory; each
+  training access randomly selects its orientation. Feature extraction is included
+  in training time. Test evaluation and single-image CPU timing execute the full
+  network, not the cached features. The full checkpoint is written once with the
+  validation-selected head and all frozen weights for standalone prediction.
 - Classical reference: standardized 16x16 RGB pixels and color histograms,
   logistic regression with regularization selected on validation.
 - `analyze.py`: learning curves, diagnostic heuristics and error galleries.

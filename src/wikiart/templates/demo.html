@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f5ee">
+  <title>Vilena — A closer look at art</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%237b3035'/%3E%3Cpath d='M10 10l10 23 10-23' fill='none' stroke='%23f7f5ee' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ url_for('static', filename='demo.css') }}">
+  <script src="{{ url_for('static', filename='demo.js') }}" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Vilena home"><span class="brand-mark">V</span><span>VILENA<span class="brand-sub">ART STYLE EXPLORER</span></span></a>
+      <span class="local-badge"><span></span> LOCAL DEMO</span>
+    </header>
+
+    <main>
+      <section class="intro">
+        <p class="eyebrow">A LITTLE ART. A DIFFERENT PERSPECTIVE.</p>
+        <h1>A closer look <em>at art.</em></h1>
+        <p class="intro-copy">Bring a painting. Explore its style through the eyes of our models.</p>
+      </section>
+
+      <div class="workspace">
+        <section class="painting-panel" aria-labelledby="painting-heading">
+          <div class="panel-heading"><h2 id="painting-heading"><span class="step">01</span> Your painting</h2><span class="subtle">JPG · PNG · WebP</span></div>
+          <label class="drop-zone" id="drop-zone" for="file-input" tabindex="0" role="button" aria-label="Choose or drop a painting image">
+            <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" hidden>
+            <div class="upload-prompt" id="upload-prompt">
+              <svg width="55" height="55" viewBox="0 0 56 56" fill="none" aria-hidden="true"><rect x="8" y="10" width="40" height="36" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="20" cy="22" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M9 39l12-11 9 8 7-7 10 10" stroke="currentColor" stroke-width="1.5"/></svg>
+              <span class="upload-title">Make room for a masterpiece.</span>
+              <span>Drop your image here, or <strong>browse files</strong></span>
+              <span class="file-limit">Up to 10 MB</span>
+            </div>
+            <img id="painting-preview" alt="Your selected painting" hidden>
+            <span class="change-image" id="change-image" hidden>Change painting ↗</span>
+          </label>
+          <div class="image-caption"><span id="image-name">Your image stays on this computer.</span><button id="clear-image" class="text-button" hidden type="button">Clear</button></div>
+
+          <fieldset class="model-picker" id="model-picker">
+            <legend>Choose your lens</legend>
+          </fieldset>
+          <button id="analyse" class="primary-button" type="button" disabled><span>Explore this painting</span><span aria-hidden="true">↗</span></button>
+          <button id="compare-all" class="compare-button" type="button" disabled><span>Compare all models</span><span aria-hidden="true">⇄</span></button>
+          <p id="error-message" class="error-message" role="alert" hidden></p>
+        </section>
+
+        <section class="result-panel" aria-labelledby="result-heading" aria-busy="false">
+          <div class="panel-heading"><h2 id="result-heading"><span class="step">02</span> A model’s perspective</h2><span class="result-tag" id="result-tag">FIVE POSSIBLE STYLES</span></div>
+          <div class="empty-state" id="empty-state">
+            <span class="empty-frame" aria-hidden="true">V</span>
+            <h3>Every painting has a story.</h3>
+            <p>Add an image to discover the style<br>our model sees in it.</p>
+            <span class="empty-rule"></span>
+            <p class="empty-footnote">One painting. Five artistic possibilities.</p>
+          </div>
+          <div class="loading-state" id="loading-state" role="status" hidden><span class="spinner"></span><h3 id="loading-title">Taking a closer look…</h3><p>The first run may take a few seconds<br>while the models get ready.</p></div>
+          <div class="comparison" id="comparison" hidden>
+            <p class="eyebrow">ONE IMAGE · DIFFERENT PERSPECTIVES</p>
+            <h3>Compare the models.</h3>
+            <p class="comparison-intro">Each model sees the same painting. Select a row to explore its five probabilities.</p>
+            <div class="comparison-columns"><span>Model</span><span>Predicted style</span><span>Analysis</span></div>
+            <div id="comparison-list"></div>
+            <p id="comparison-truth" class="example-truth" hidden></p>
+            <p id="comparison-errors" class="error-message" hidden></p>
+            <p class="probability-note">A larger probability does not mean a more accurate model. Times cover preprocessing and prediction on this image, excluding model loading; they are not a benchmark.</p>
+          </div>
+          <div class="prediction" id="prediction" hidden>
+            <button class="text-button comparison-back" id="comparison-back" type="button" hidden>← Back to all models</button>
+            <p class="eyebrow">PREDICTED STYLE</p>
+            <h3 id="predicted-style"></h3>
+            <p class="prediction-source" id="prediction-source"></p>
+            <div class="distribution-heading"><h4>The five possibilities</h4><span>Model probability</span></div>
+            <div class="probability-list" id="probability-list"></div>
+            <div class="example-truth" id="example-truth" hidden></div>
+            <p class="probability-note">The model chooses among these five styles. Its probabilities are not a guarantee that a prediction is correct.</p>
+          </div>
+        </section>
+      </div>
+
+      <section class="examples-section" id="examples-section" hidden>
+        <div class="examples-heading"><h2>Or start with a painting from our collection.</h2><p>Five examples from the held-out test set.</p></div>
+        <div class="examples-grid" id="examples-grid"></div>
+      </section>
+    </main>
+
+    <footer><span>VILENA <span class="footer-divider">/</span> WIKIART STYLE CLASSIFICATION</span><span>Baroque · Cubism · Impressionism · Pop Art · Ukiyo-e</span></footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,106 @@
+{
+  "test_loss": 0.5755137651196441,
+  "test_accuracy": 0.8044444444444444,
+  "classification_report": {
+    "Baroque": {
+      "precision": 0.85,
+      "recall": 0.7555555555555555,
+      "f1-score": 0.8,
+      "support": 45.0
+    },
+    "Cubism": {
+      "precision": 0.8222222222222222,
+      "recall": 0.8222222222222222,
+      "f1-score": 0.8222222222222222,
+      "support": 45.0
+    },
+    "Impressionism": {
+      "precision": 0.7307692307692307,
+      "recall": 0.8444444444444444,
+      "f1-score": 0.7835051546391752,
+      "support": 45.0
+    },
+    "Pop_Art": {
+      "precision": 0.7555555555555555,
+      "recall": 0.7555555555555555,
+      "f1-score": 0.7555555555555555,
+      "support": 45.0
+    },
+    "Ukiyo_e": {
+      "precision": 0.8837209302325582,
+      "recall": 0.8444444444444444,
+      "f1-score": 0.8636363636363636,
+      "support": 45.0
+    },
+    "accuracy": 0.8044444444444444,
+    "macro avg": {
+      "precision": 0.8084535877559134,
+      "recall": 0.8044444444444444,
+      "f1-score": 0.8049838592106633,
+      "support": 225.0
+    },
+    "weighted avg": {
+      "precision": 0.8084535877559134,
+      "recall": 0.8044444444444444,
+      "f1-score": 0.8049838592106634,
+      "support": 225.0
+    }
+  },
+  "metadata": {
+    "model": "vgg16",
+    "seed": 0,
+    "dataset_signature": "07dd1bd2f78cc0b633b74ac2149d9e3d00b82da3d2003e3807fea8ca203b56b6",
+    "image_size": 224,
+    "normalization": "imagenet",
+    "best_epoch": 49,
+    "training": {
+      "data_dir": "C:\\Users\\lgrandjean\\OneDrive - Université Paris Sciences et Lettres\\AS_Y5\\Y5_S9\\Y5_S9_DEEP-LEARNING\\final-project\\data\\wikiart_style5",
+      "checkpoint": "checkpoints\\comparaison_vgg16\\vgg16\\best_model.pt",
+      "history": "outputs\\comparaison_vgg16\\vgg16\\history.json",
+      "epochs": 50,
+      "batch_size": 32,
+      "image_size": 224,
+      "model": "vgg16",
+      "hidden_dim": 256,
+      "hidden1": 256,
+      "hidden2": 128,
+      "dropout": 0.0,
+      "weight_decay": 0.0,
+      "width": 1,
+      "learning_rate": 0.0001,
+      "optimizer": "adam",
+      "normalization": "imagenet",
+      "seed": 0,
+      "device": "cpu",
+      "threads": 1,
+      "torch": "2.14.1+cpu",
+      "preparation_seconds": 2.580922900000587,
+      "training_seconds": 658.3022163999849,
+      "training_timing_scope": "Frozen feature extraction (when used), all epochs, validation and checkpoint writes; excludes preparation",
+      "feature_extraction_seconds": 656.7177417000057,
+      "transfer_mode": "frozen_features_linear_head",
+      "pretrained_weights": "VGG16_Weights.IMAGENET1K_V1",
+      "trainable_parameters": 20485,
+      "dataset_signature": "07dd1bd2f78cc0b633b74ac2149d9e3d00b82da3d2003e3807fea8ca203b56b6",
+      "split_counts": {
+        "train": 1050,
+        "validation": 225,
+        "test": 225
+      }
+    },
+    "hidden1": 256,
+    "hidden2": 128,
+    "dropout": 0.0,
+    "mlp_implementation": null,
+    "transfer_mode": "frozen_features_linear_head",
+    "classes": [
+      "Baroque",
+      "Cubism",
+      "Impressionism",
+      "Pop_Art",
+      "Ukiyo_e"
+    ],
+    "test_count": 225,
+    "test_signature": "0b1dc18ea16b85b3c57fc3eddd01ebe7d6839e42bce47f0d633cdd6e460341db"
+  }
+}
